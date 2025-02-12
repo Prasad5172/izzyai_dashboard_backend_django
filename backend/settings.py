@@ -39,6 +39,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'auth' , 
     'rest_framework',
+    'clinc' ,
+    'payments' ,
+    'sales_director' ,
+    'sales_person' ,
+    'slp',
+    'notifications',
+    'appointments',
 ]
 
 MIDDLEWARE = [
