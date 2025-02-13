@@ -1,7 +1,7 @@
 from django.db import models
 # Create your models here.
 class Notification(models.Model):
-    user_id = models.ForeignKey('authentication.Users', on_delete=models.CASCADE)
+    user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
     is_read = models.BooleanField(default=False)
     time = models.DateTimeField()
     message = models.TextField()
