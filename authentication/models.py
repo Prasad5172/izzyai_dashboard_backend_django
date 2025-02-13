@@ -24,7 +24,7 @@ class Users(models.Model):
 
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(Users, on_delete=models.CASCADE)
+    user_id = models.OneToOneField(Users, on_delete=models.CASCADE)
     clinic_id = models.BigIntegerField(null=True, blank=True)
     full_name = models.CharField(max_length=255)
     gender = models.CharField(max_length=50)
@@ -35,7 +35,8 @@ class UserProfile(models.Model):
     state = models.CharField(max_length=255)
     status = models.CharField(max_length=255)
     profile_id = models.IntegerField(unique=True)
-    slp_id = models.BigIntegerField(null=True, blank=True)
+    #slp_id = models.BigIntegerField(null=True, blank=True)
+    slp_id = models.ForeignKey('slp.Slps', on_delete=models.CASCADE)
     avatar_id = models.IntegerField(null=True, blank=True)
     face_authentication_state = models.BooleanField(default=False)
     contact_number = models.BigIntegerField(null=True, blank=True)
@@ -50,7 +51,7 @@ class UserFiles(models.Model):
     file_id = models.BigAutoField(primary_key=True)
     role = models.CharField(max_length=255)
     file_path = models.TextField()
-    user = models.ForeignKey(Users, on_delete=models.CASCADE)
+    user_id = models.ForeignKey(Users, on_delete=models.CASCADE)
     upload_timestamp = models.DateTimeField(auto_now_add=True)
     file_name = models.CharField(max_length=255)
 
@@ -64,10 +65,12 @@ class UserExercises(models.Model):
     level_name = models.CharField(max_length=255)
     world_id = models.IntegerField()
     sound_id = models.IntegerField()
-    session_id = models.IntegerField()
+    #session_id = models.IntegerField()
+    session_id = models.ForeignKey('clinc.Session', on_delete=models.CASCADE)
     sound_id_list = models.CharField(max_length=255)
-    disorder_id = models.IntegerField()
-    user = models.ForeignKey(Users, on_delete=models.CASCADE)
+    #disorder_id = models.IntegerField()
+    disorder_id = models.ForeignKey('clinc.Disorders', on_delete=models.CASCADE)
+    user_id = models.ForeignKey(Users, on_delete=models.CASCADE)
     completion_status = models.CharField(max_length=255)
     exercise_date = models.DateTimeField()
     score = models.FloatField()
@@ -83,7 +86,7 @@ class UserExercises(models.Model):
 
 class UsersInsurance(models.Model):
     cpt_number = models.CharField(max_length=255)
-    user = models.ForeignKey(Users, on_delete=models.CASCADE)
+    user_id = models.ForeignKey(Users, on_delete=models.CASCADE)
     insurance_provider = models.CharField(max_length=255)
     insurance_status = models.CharField(max_length=255)
     policy_number = models.BigIntegerField()

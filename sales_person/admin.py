@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (
-    SalePersonActivityLog, SalePersonPipeline, SalePerson,  SalesTarget
+    SalePersonActivityLog, SalePersonPipeline, SalePersons,  SalesTarget
 )
 # Register your models here.
 @admin.register(SalePersonActivityLog)
@@ -17,7 +17,7 @@ class SalePersonPipelineAdmin(admin.ModelAdmin):
     list_filter = ('date',)
 
 
-@admin.register(SalePerson)
+@admin.register(SalePersons)
 class SalePersonAdmin(admin.ModelAdmin):
     list_display = ('name', 'email', 'phone', 'state', 'country', 'status', 'subscription_count', 'commission_percent')
     search_fields = ('name', 'email')

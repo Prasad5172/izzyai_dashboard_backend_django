@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 # Register your models here.
-from .models import Payment, Invoice, Coupon
+from .models import Payment, Invoice, Coupon,Subscriptions
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
@@ -20,3 +20,9 @@ class CouponAdmin(admin.ModelAdmin):
     list_display = ('coupon_id', 'code', 'discount', 'expiration_date', 'is_used')
     search_fields = ('code',)
     list_filter = ('is_used', 'user_type')
+
+@admin.register(Subscriptions)
+class SubscriptionsAdmin(admin.ModelAdmin):
+    list_display = ('subscription_id', 'subscription_name', 'subscription_price')
+    search_fields = ('subscription_id', 'subscription_name')
+    list_filter = ('subscription_price', 'subscription_name')

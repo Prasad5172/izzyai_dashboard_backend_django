@@ -37,17 +37,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'auth' , 
+    'authentication' , 
     'rest_framework',
-    'clinc' ,
+    'clinic' ,
     'payments' ,
     'sales_director' ,
     'sales_person' ,
     'slp',
     'notifications',
-    'appointments',
-    'patients' , 
-    'subscription',
 ]
 
 MIDDLEWARE = [
