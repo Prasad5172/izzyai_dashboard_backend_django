@@ -6,7 +6,7 @@ class SalePersons(models.Model):
     state = models.CharField(max_length=255)
     country = models.CharField(max_length=255)
     status = models.CharField(max_length=255)
-    user_id = models.ForeignKey('auth.Users', on_delete=models.CASCADE)
+    user_id = models.ForeignKey('authentication.Users', on_delete=models.CASCADE)
     subscription_id = models.ForeignKey('subscription.Subscription', on_delete=models.CASCADE)
     subscription_count = models.BigIntegerField()
     commission_percent = models.BigIntegerField()

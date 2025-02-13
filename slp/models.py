@@ -1,6 +1,4 @@
 from django.db import models
-from ..clinic.models import Disorders,Clinics
-from ..authentication.models import Users
 # Create your models here.
 class Slps(models.Model):
     slp_id = models.BigIntegerField(unique=True)
@@ -11,9 +9,9 @@ class Slps(models.Model):
     email = models.EmailField(unique=True)
     slp_name = models.CharField(max_length=255)
     #user_id = models.BigIntegerField(unique=True)
-    user_id = models.ForeignKey(Users, on_delete=models.CASCADE)
+    user_id = models.ForeignKey('authentication.Users', on_delete=models.CASCADE)
     #clinic_id = models.BigIntegerField(null=True, blank=True)
-    clinic_id = models.ForeignKey(Clinics, on_delete=models.CASCADE)
+    clinic_id = models.ForeignKey('clinic.Clinics', on_delete=models.CASCADE)
     phone = models.BigIntegerField(unique=True)
 
     def __str__(self):  
@@ -21,12 +19,12 @@ class Slps(models.Model):
 
 class SlpAppointments(models.Model):
     #disorder_id = models.BigIntegerField()
-    disorder_id = models.ForeignKey(Disorders, on_delete=models.CASCADE)
+    disorder_id = models.ForeignKey('clinic.Disorders', on_delete=models.CASCADE)
     appointment_id = models.BigIntegerField(unique=True)
     #slp_id = models.BigIntegerField(null=True, blank=True)
     slp_id = models.ForeignKey(Slps, on_delete=models.CASCADE)
     #user_id = models.BigIntegerField(null=True, blank=True)
-    user_id = models.ForeignKey(Users, on_delete=models.CASCADE)
+    user_id = models.ForeignKey('authentication.Users', on_delete=models.CASCADE)
     appointment_date = models.DateTimeField(null=False, blank=False)
     session_type = models.CharField(max_length=255)
     appointment_status = models.CharField(max_length=255)
