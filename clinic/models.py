@@ -9,7 +9,7 @@ class Clinics(models.Model):
     total_patients = models.BigIntegerField(default=0)
     slp_count = models.BigIntegerField(default=0)
     #sale_person_id = models.BigIntegerField(null=True, blank=True) # need to add mapping to sales person
-    sale_person_id = models.ForeignKey('sales_person.Salesperson', on_delete=models.CASCADE)
+    sale_person_id = models.ForeignKey('sales_person.SalePersons', on_delete=models.CASCADE)
     country = models.CharField(max_length=255)
     #UserId = models.BigIntegerField(null=True, blank=True)
     user_id = models.ForeignKey('authentication.Users', on_delete=models.CASCADE) 
@@ -112,7 +112,7 @@ class DemoRequested(models.Model):
     comments = models.CharField(max_length=255)
     contact_number = models.BigIntegerField(unique=True)
     #sales_person_id = models.BigIntegerField(null=True, blank=True) #need add mapping to sales person
-    sales_person_id = models.ForeignKey('sales_person.Salesperson', on_delete=models.CASCADE)
+    sales_person_id = models.ForeignKey('sales_person.SalePersons', on_delete=models.CASCADE)
     email = models.EmailField(unique=True) # check is it necessary if sales person has email field
     patients_count = models.CharField(max_length=255)
 
@@ -169,7 +169,7 @@ class TreatmentData(models.Model):
     #user_id = models.BigIntegerField(null=True, blank=True)
     user_id = models.ForeignKey('authentication.Users', on_delete=models.CASCADE)
     #slp_id = models.IntegerField(null=True, blank=True)
-    slp_id = models.ForeignKey('auth.slps', on_delete=models.CASCADE)
+    slp_id = models.ForeignKey('slp.Slps', on_delete=models.CASCADE)
     goal = models.CharField(max_length=255)
     patient_name = models.CharField(max_length=255)
 

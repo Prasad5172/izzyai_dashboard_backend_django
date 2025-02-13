@@ -19,7 +19,7 @@ class SalePersonPipelineAdmin(admin.ModelAdmin):
 
 @admin.register(SalePersons)
 class SalePersonAdmin(admin.ModelAdmin):
-    list_display = ('name', 'email', 'phone', 'state', 'country', 'status', 'subscription_count', 'commission_percent')
+    list_display = (  'phone', 'state', 'country', 'status', 'subscription_count', 'commission_percent')
     search_fields = ('name', 'email')
     list_filter = ('state', 'country', 'status')
 
