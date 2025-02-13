@@ -1,3 +1,25 @@
 from django.db import models
+from ..auth.models import User
+from ..sales_person.models import Salesperson
+from ..clinic.models import Clinic
+class Sales(models.Model):
+    sale_person_id = models.ForeignKey(SalePerson, on_delete=models.CASCADE)
+    sales_id = models.BigIntegerField()
+    subscription_count = models.BigIntegerField()
+    commission_percent = models.BigIntegerField()
+    clinic_id = models.ForeignKey(clinic, on_delete=models.CASCADE)
+    payment_status = models.CharField(max_length=255)
+    subscription_type = models.CharField(max_length=255)
 
-# Create your models here.
+    def __str__(self):
+        return f"Sales ID {self.sales_id} - SalePerson {self.sale_person_id}"
+
+
+class SalesDirector(models.Model):
+    sales_director_id = models.BigIntegerField()
+    user_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    department = models.CharField(max_length=255)
+    designation = models.CharField(max_length=255)
+
+    def __str__(self):
+        return f"Sales Director {self.sales_director_id} - {self.department}"

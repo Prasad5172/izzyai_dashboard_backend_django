@@ -46,6 +46,8 @@ INSTALLED_APPS = [
     'slp',
     'notifications',
     'appointments',
+    'patients' , 
+    'subscription',
 ]
 
 MIDDLEWARE = [
