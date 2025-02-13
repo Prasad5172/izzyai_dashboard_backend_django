@@ -14,7 +14,7 @@ class Sales(models.Model):
 
 class SalesDirector(models.Model):
     sales_director_id = models.BigIntegerField(unique=True)
-    user_id = models.ForeignKey('authentication.Users', on_delete=models.CASCADE)
+    user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
     department = models.CharField(max_length=255)
     designation = models.CharField(max_length=255)
 

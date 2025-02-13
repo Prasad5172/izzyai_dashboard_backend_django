@@ -1,7 +1,29 @@
 from django.db import models
+from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.utils.translation import gettext_lazy as _
 
-class Users(models.Model):
-    username = models.CharField(max_length=255, unique=True)
+# Custom User Manager
+class CustomUserManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError(_("The Email field must be set"))
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+
+        return self.create_user(email, password, **extra_fields)
+
+
+# Custom User Model
+class CustomUser(AbstractUser):
+    email = models.EmailField(unique=True)
+    user_id = models.BigIntegerField(unique=True)
     warning_count = models.IntegerField(default=0)
     is_apple_user = models.BooleanField(default=False)
     is_google_user = models.BooleanField(default=False)
@@ -15,16 +37,26 @@ class Users(models.Model):
     otp_created_at = models.DateTimeField(null=True, blank=True)
     user_type = models.CharField(max_length=255)
     password_hash = models.CharField(max_length=255)
-    email = models.EmailField(unique=True)
-    user_id = models.BigIntegerField(unique=True)
     created_account = models.DateTimeField(auto_now_add=True)
+
+    groups = models.ManyToManyField(
+        "auth.Group",
+        related_name="customuser_groups",
+        blank=True
+    )
+    user_permissions = models.ManyToManyField(
+        "auth.Permission",
+        related_name="customuser_permissions",
+        blank=True
+    )
 
     def __str__(self):
         return self.username
 
 
+# User Profile Model
 class UserProfile(models.Model):
-    user_id = models.OneToOneField(Users, on_delete=models.CASCADE)
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
     clinic_id = models.BigIntegerField(null=True, blank=True)
     full_name = models.CharField(max_length=255)
     gender = models.CharField(max_length=50)
@@ -35,7 +67,6 @@ class UserProfile(models.Model):
     state = models.CharField(max_length=255)
     status = models.CharField(max_length=255)
     profile_id = models.IntegerField(unique=True)
-    #slp_id = models.BigIntegerField(null=True, blank=True)
     slp_id = models.ForeignKey('slp.Slps', on_delete=models.CASCADE)
     avatar_id = models.IntegerField(null=True, blank=True)
     face_authentication_state = models.BooleanField(default=False)
@@ -47,11 +78,12 @@ class UserProfile(models.Model):
         return self.full_name
 
 
+# User Files Model
 class UserFiles(models.Model):
     file_id = models.BigAutoField(primary_key=True)
     role = models.CharField(max_length=255)
     file_path = models.TextField()
-    user_id = models.ForeignKey(Users, on_delete=models.CASCADE)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     upload_timestamp = models.DateTimeField(auto_now_add=True)
     file_name = models.CharField(max_length=255)
 
@@ -59,18 +91,17 @@ class UserFiles(models.Model):
         return self.file_name
 
 
+# User Exercises Model
 class UserExercises(models.Model):
     total_questions = models.IntegerField()
     user_exercise_id = models.IntegerField(unique=True)
     level_name = models.CharField(max_length=255)
     world_id = models.IntegerField()
     sound_id = models.IntegerField()
-    #session_id = models.IntegerField()
     session_id = models.ForeignKey('clinic.Sessions', on_delete=models.CASCADE)
     sound_id_list = models.CharField(max_length=255)
-    #disorder_id = models.IntegerField()
     disorder_id = models.ForeignKey('clinic.Disorders', on_delete=models.CASCADE)
-    user_id = models.ForeignKey(Users, on_delete=models.CASCADE)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     completion_status = models.CharField(max_length=255)
     exercise_date = models.DateTimeField()
     score = models.FloatField()
@@ -81,12 +112,13 @@ class UserExercises(models.Model):
     world_id_list = models.CharField(max_length=255)
 
     def __str__(self):
-        return f"Exercise {self.user_exercise_id} - {self.user.username}"
+        return f"Exercise {self.user_exercise_id} - {self.user.email}"
 
 
+# Users Insurance Model
 class UsersInsurance(models.Model):
     cpt_number = models.CharField(max_length=255)
-    user_id = models.ForeignKey(Users, on_delete=models.CASCADE)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     insurance_provider = models.CharField(max_length=255)
     insurance_status = models.CharField(max_length=255)
     policy_number = models.BigIntegerField()
@@ -94,4 +126,4 @@ class UsersInsurance(models.Model):
     claim_date = models.DateField()
 
     def __str__(self):
-        return f"Insurance {self.insurance_provider} - {self.user.username}"
+        return f"Insurance {self.insurance_provider} - {self.user.email}"

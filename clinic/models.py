@@ -12,7 +12,7 @@ class Clinics(models.Model):
     sale_person_id = models.ForeignKey('sales_person.SalePersons', on_delete=models.CASCADE)
     country = models.CharField(max_length=255)
     #UserId = models.BigIntegerField(null=True, blank=True)
-    user_id = models.ForeignKey('authentication.Users', on_delete=models.CASCADE) 
+    user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE) 
     email = models.EmailField(unique=True)
     ein_number = models.BigIntegerField(unique=True)
     phone = models.BigIntegerField(unique=True)
@@ -51,7 +51,7 @@ class ClinicAppointments(models.Model):
     #disorder_id =  models.BigIntegerField(null=True, blank=True)
     disorder_id = models.ForeignKey(Disorders, on_delete=models.CASCADE)
     #UserID = models.BigIntegerField(null=True, blank=True)
-    user_id = models.ForeignKey('authentication.Users', on_delete=models.CASCADE)
+    user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
 
     def __str__(self):
         return self.appointment_id
@@ -89,7 +89,7 @@ class Sessions(models.Model):
     session_status = models.CharField(max_length=255)
     session_id = models.BigIntegerField(unique=True)
     #user_id = models.BigIntegerField(unique=True)
-    user_id = models.ForeignKey('authentication.Users',on_delete=models.CASCADE)
+    user_id = models.ForeignKey('authentication.CustomUser',on_delete=models.CASCADE)
     #session_type_id = models.BigIntegerField(null=True, blank=True)
     session_type_id = models.ForeignKey(SessionType, on_delete=models.CASCADE)
     start_time = models.DateTimeField(null=False, blank=False)
@@ -126,7 +126,7 @@ class PatientFiles(models.Model):
     diagnosis_name = models.CharField(max_length=255)
     upload_timestamp = models.DateTimeField(null=False, blank=False)
     #user_id = models.BigIntegerField(null=False,blank=False)
-    user_id = models.ForeignKey('authentication.Users', on_delete=models.CASCADE)
+    user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
     file_path = models.TextField(max_length=255)
     role = models.CharField(max_length=255)
 
@@ -153,7 +153,7 @@ class TherapyData(models.Model):
     #slp_id = models.BigIntegerField(null=True, blank=True)
     slp_id = models.ForeignKey('slp.Slps', on_delete=models.CASCADE)
     #user_id = models.BigIntegerField(null=True, blank=True)
-    user_id = models.ForeignKey('authentication.Users', on_delete=models.CASCADE)
+    user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.patient_name}-objective-{self.objective}"
@@ -167,7 +167,7 @@ class TreatmentData(models.Model):
     patient_age = models.IntegerField(validators=[MinValueValidator(0), MaxValueValidator(100)], null=True, blank=True)
     date = models.DateTimeField(null=False, blank=False)
     #user_id = models.BigIntegerField(null=True, blank=True)
-    user_id = models.ForeignKey('authentication.Users', on_delete=models.CASCADE)
+    user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
     #slp_id = models.IntegerField(null=True, blank=True)
     slp_id = models.ForeignKey('slp.Slps', on_delete=models.CASCADE)
     goal = models.CharField(max_length=255)
@@ -180,7 +180,7 @@ class TreatmentData(models.Model):
 class AssessmentResults(models.Model):
     assessment_id = models.BigIntegerField(unique=True)
     #user_id = models.BigIntegerField(unique=True)
-    user_id = models.ForeignKey('authentication.Users', on_delete=models.CASCADE)
+    user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
     #session_id = models.BigIntegerField()
     session_id = models.ForeignKey(Sessions, on_delete=models.CASCADE)
     score = models.FloatField()
