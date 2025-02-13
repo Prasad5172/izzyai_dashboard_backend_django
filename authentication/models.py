@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.utils.translation import gettext_lazy as _
-
+import uuid 
 # Custom User Manager
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -23,7 +23,8 @@ class CustomUserManager(BaseUserManager):
 # Custom User Model
 class CustomUser(AbstractUser):
     email = models.EmailField(unique=True)
-    user_id = models.BigIntegerField(unique=True)
+    user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
     warning_count = models.IntegerField(default=0)
     is_apple_user = models.BooleanField(default=False)
     is_google_user = models.BooleanField(default=False)
@@ -49,7 +50,7 @@ class CustomUser(AbstractUser):
         related_name="customuser_permissions",
         blank=True
     )
-
+    objects = CustomUserManager()
     def __str__(self):
         return self.username
 
