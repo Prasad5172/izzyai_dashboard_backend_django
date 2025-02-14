@@ -36,9 +36,8 @@ class CustomUser(AbstractUser):
     is_setup_profile = models.BooleanField(default=False)
     otp_created_at = models.DateTimeField(null=True, blank=True)
     user_type = models.CharField(max_length=255)
-    password_hash = models.CharField(max_length=255)
     created_account = models.DateTimeField(auto_now_add=True)
-
+    username = models.CharField(unique=True,max_length=255)
     groups = models.ManyToManyField(
         "auth.Group",
         related_name="customuser_groups",
@@ -58,7 +57,7 @@ class CustomUser(AbstractUser):
 class UserProfile(models.Model):
     profile_id = models.BigAutoField(primary_key=True)
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
-    clinic_id = models.BigIntegerField(null=True, blank=True)
+    clinic_id = models.ForeignKey('clinic.Clinics', on_delete=models.SET_NULL, null=True, blank=True, related_name="user_profiles")
     full_name = models.CharField(max_length=255)
     gender = models.CharField(max_length=50)
     checkbox_values = models.TextField(null=True, blank=True)

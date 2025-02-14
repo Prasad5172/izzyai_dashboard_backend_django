@@ -8,11 +8,11 @@ class SalePersons(models.Model):
     status = models.CharField(max_length=255)
     user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
     subscription_id = models.ForeignKey('payment.Subscriptions', on_delete=models.CASCADE)
-    subscription_count = models.BigIntegerField()
-    commission_percent = models.BigIntegerField()
+    subscription_count = models.BigIntegerField(default=0)
+    commission_percent = models.BigIntegerField(default=0)
 
     def __str__(self):        
-        return f"SalePerson {self.name} - {self.email}"
+        return f"SalePerson {self.sale_person_id} - {self.status}"
 
 class SalesTarget(models.Model):
     sales_target_id = models.BigAutoField(primary_key=True)

@@ -1,4 +1,8 @@
+import os
+import django
 import random
+django.setup()
+
 from faker import Faker
 from authentication.models import CustomUser, UserProfile,UserFiles,UserExercises,UsersInsurance
 from clinic.models import Clinics, Disorders, Sessions, SessionType,ClinicAppointments,ClinicUserReminders,DemoRequested,PatientFiles,Tasks,TherapyData,AssessmentResults,TreatmentData
@@ -426,4 +430,6 @@ def run():
     print("Fake data inserted successfully!")
 
 if __name__ == "__main__":
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.settings")  # Replace with your Django project name
+    
     run()

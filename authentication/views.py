@@ -12,14 +12,14 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
 from datetime import timedelta
-from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth import authenticate
 from authentication.models import CustomUser
-import time 
 from slp.models import Slps
 from sales_person.models import SalePersons
 from clinic.models import Clinics
 from sales_director.models import SalesDirector
 from adminer.models import Adminer
+from payment.models import Subscriptions
 from utils.otp import generate_otp_for_signup
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -122,19 +122,17 @@ class SignupAPIView(APIView):
         if user_type not in ['admin', 'sales_director']:
             return Response({"error": "Invalid user type"}, status=status.HTTP_400_BAD_REQUEST)
         
-        #if CustomUser.objects.filter(email=email , verified=True).exists():
-        #    return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
-                    
-        user = CustomUser.objects.filter(email=email)
-        if(not user):
-            return Response({"error": "Not Registered"}, status=status.HTTP_400_BAD_REQUEST)
-        elif (user and not user.verified):
+        try:
+            user = CustomUser.objects.get(email=email)
+        except Clinics.DoesNotExist:
+            raise InvalidToken("Not Registred")
+        if(user and not user.verified):
             return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
         
 
         if( user_type == 'admin'):
             Adminer.objects.create(
-                user_id = user.user_id,
+                user_id = user,
                 department = department,
                 designation = designation
             )
@@ -142,7 +140,7 @@ class SignupAPIView(APIView):
             user.save()
         elif( user_type == 'sales_director'):
             SalesDirector.objects.create(
-                user_id = user.user_id,
+                user_id = user,
                 department = department,
                 designation = designation
             )
@@ -184,16 +182,18 @@ class SlpSignupAPIView(APIView):
         country = request.data.get('Country')
         clinic_id = request.data.get('ClinicID')
 
-        
-
-        user = CustomUser.objects.get(email=email)
-        if(not user):
-            return Response({"error": "Not Registered"}, status=status.HTTP_400_BAD_REQUEST)
-        elif (user and not user.verified):
+        try:
+            user = CustomUser.objects.get(email=email)
+        except Clinics.DoesNotExist:
+            raise InvalidToken("Not Registred")
+        if(user and not user.verified):
             return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
-        #clinic = Clinics.objects.filter(clinic_id=clinic_id)
-        #if not clinic:
-        #    return Response({"error": "Clinic not found"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            clinic = Clinics.objects.get(clinic_id=clinic_id)
+        except Clinics.DoesNotExist:
+            raise InvalidToken("clinic not found for the provided token.")
+        
         try:
             Slps.objects.create(
                 slp_name=slp_name,
@@ -201,7 +201,7 @@ class SlpSignupAPIView(APIView):
                 state=state,
                 country=country,
                 user_id=user,
-                #clinic_id = clinic
+                clinic_id = clinic
             )
             user.user_type = user_type
             user.save()
@@ -226,25 +226,26 @@ class Sales_Person_SignupAPIView(APIView):
         email = request.data.get('email')
 
         # saleperson-specific fields
-        sale_person_name = request.data.get('Name')
         phone = request.data.get('Phone')
         state = request.data.get('State')
         country = request.data.get('Country')
         user_type = "sales_person"
         
-        user = CustomUser.objects.filter(email=email)
-        if(not user):
-            return Response({"error": "Not Registered"}, status=status.HTTP_400_BAD_REQUEST)
-        elif (user and not user.verified):
-            return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
-
         try:
-            Slps.objects.create(
-                sale_person_name=sale_person_name,
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+        if(user and not user.verified):
+            return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        subscription = Subscriptions.objects.get(subscription_id=1) #ask jayanth
+        try:
+            SalePersons.objects.create(
                 phone=phone,
                 state=state,
                 country=country,
-                user_id=user
+                user_id=user,
+                subscription_id = subscription
             )
             user.user_type = user_type
             user.save()
@@ -280,12 +281,13 @@ class ClinicSignupAPIView(APIView):
 
         
 
-        user = CustomUser.objects.filter(email=email)
-        if(not user):
-            return Response({"error": "Not Registered"}, status=status.HTTP_400_BAD_REQUEST)
-        elif (user and not user.verified):
+        try:
+            user = CustomUser.objects.get(email=email)
+        except Clinics.DoesNotExist:
+            raise InvalidToken("Not Registred")
+        if(user and not user.verified):
             return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
-
+        sale_person = SalePersons.objects.get(sale_person_id=sale_person_id)
         # Create the user
         try :
             Clinics.objects.create(
@@ -296,11 +298,10 @@ class ClinicSignupAPIView(APIView):
                 email=email,
                 address=address,
                 user_id=user,
-                sale_person_id=sale_person_id,
                 slp_count=slp_count,
-                total_patient=total_patient,
                 ein_number=ein_number,
                 izzyai_patients = izzyai_patients,
+                sale_person_id = sale_person
             )
 
             user.user_type = user_type
@@ -318,6 +319,7 @@ class ClinicSignupAPIView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+#need to test all cases
 class SendOTPView(APIView):
     # permission_classes = [IsAuthenticated]
 
@@ -327,7 +329,7 @@ class SendOTPView(APIView):
         password = request.data.get('password')
 
 
-        user = CustomUser.objects.filter(email=email)
+        user = CustomUser.objects.filter(email=email).first()
         otp = 1234
         if user and user.verified:
             return Response({"error": "User is already verified"}, status=status.HTTP_400_BAD_REQUEST)
@@ -335,18 +337,19 @@ class SendOTPView(APIView):
             otp = generate_otp_for_signup()
             user.otp = otp
             user.save()
-        else: #else
+        else:
             otp = generate_otp_for_signup()
             user = CustomUser.objects.create(
-               username=username,
+                username=username,
                 email=email,
-                password_hash=password,
                 is_otp_verified=False,
                 is_setup_profile=False,
             )
+            user.set_password(password)
             user.otp = otp
             user.save()
-        print(otp )
+        print(password)
+        print(user.password)
         #need to send otp to email
         #send_otp_email(email, otp) 
         return Response({"message": "OTP sent successfully"}, status=status.HTTP_200_OK)
@@ -427,12 +430,10 @@ class LoginAPIView(APIView):
         """
         email = request.data.get('email')
         password = request.data.get('password')
-
-        if not email or not password:
-            return Response({"error": "Email and password are required"}, status=status.HTTP_400_BAD_REQUEST)
+        print(password)
 
         user = authenticate(email=email, password=password)
-
+        
         if user is None:
             return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 

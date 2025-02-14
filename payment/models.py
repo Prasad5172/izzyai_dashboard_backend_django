@@ -6,9 +6,8 @@ class Subscriptions(models.Model) :
     subscription_price = models.FloatField()
     subscription_name = models.CharField(max_length=255)
 
-
     def __str__(self):
-        return f"Subscription {self.subscription_id} - User {self.user_id}"
+        return f"Subscription {self.subscription_id}"
 class Payment(models.Model):
     payment_id = models.BigAutoField(primary_key=True)
     plan = models.CharField(max_length=50)
