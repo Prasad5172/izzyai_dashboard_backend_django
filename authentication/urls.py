@@ -16,7 +16,16 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path , include
+from .views import SignupAPIView ,SlpSignupAPIView , Sales_Person_SignupAPIView , ClinicSignupAPIView , SendOTPView ,VerifyOTPView, UpdatePasswordView , LoginAPIView
 urlpatterns = [
-   
+   path('signup/',SignupAPIView.as_view(),name="signup"),
+   path('slp_signup/',SlpSignupAPIView.as_view(),name="slp_signup"),
+   path('sale_person_signup/',Sales_Person_SignupAPIView.as_view(),name="sales_person_signup"),
+   path('clinic_signup/',ClinicSignupAPIView.as_view(),name="clinc_signup"),
+   path('sendotp/',SendOTPView.as_view(),name="sendotp"),
+   path('verifyotp/',VerifyOTPView.as_view(),name="verifyotp"),
+   path('update_password/' , UpdatePasswordView.as_view(), name="update_password"),
+   path('login/' , LoginAPIView.as_view(), name="login")
+  
 
 ]

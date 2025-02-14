@@ -30,10 +30,10 @@ class CustomUser(AbstractUser):
     is_google_user = models.BooleanField(default=False)
     last_login = models.DateTimeField(null=True, blank=True)
     otp = models.IntegerField(null=True, blank=True)
-    is_otp_verified = models.BooleanField(default=False)
+    is_otp_verified = models.BooleanField(default=False)  # remove
     verified = models.BooleanField(default=False)
     source = models.CharField(max_length=255, null=True, blank=True)
-    otp_for_signup = models.CharField(max_length=255, null=True, blank=True)
+    otp_for_signup = models.CharField(max_length=255, null=True, blank=True)     #  remove
     is_setup_profile = models.BooleanField(default=False)
     otp_created_at = models.DateTimeField(null=True, blank=True)
     user_type = models.CharField(max_length=255)
