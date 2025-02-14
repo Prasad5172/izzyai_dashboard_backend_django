@@ -1,7 +1,7 @@
 from django.db import models
 # Create your models here.
 class Slps(models.Model):
-    slp_id = models.BigIntegerField(unique=True)
+    slp_id = models.BigAutoField(primary_key=True)
     profile_image_path = models.TextField(null=True, blank=True)
     status = models.CharField(max_length=50)
     country = models.CharField(max_length=255)
@@ -19,8 +19,8 @@ class Slps(models.Model):
 
 class SlpAppointments(models.Model):
     #disorder_id = models.BigIntegerField()
+    appointment_id = models.BigAutoField(primary_key=True)
     disorder_id = models.ForeignKey('clinic.Disorders', on_delete=models.CASCADE)
-    appointment_id = models.BigIntegerField(unique=True)
     #slp_id = models.BigIntegerField(null=True, blank=True)
     slp_id = models.ForeignKey(Slps, on_delete=models.CASCADE)
     #user_id = models.BigIntegerField(null=True, blank=True)

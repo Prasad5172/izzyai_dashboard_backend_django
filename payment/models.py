@@ -2,7 +2,7 @@ from django.db import models
 # Create your models here.
 
 class Subscriptions(models.Model) : 
-    subscription_id = models.BigIntegerField(primary_key=True)
+    subscription_id = models.BigAutoField(primary_key=True)
     subscription_price = models.FloatField()
     subscription_name = models.CharField(max_length=255)
 
@@ -10,6 +10,7 @@ class Subscriptions(models.Model) :
     def __str__(self):
         return f"Subscription {self.subscription_id} - User {self.user_id}"
 class Payment(models.Model):
+    payment_id = models.BigAutoField(primary_key=True)
     plan = models.CharField(max_length=50)
     payment_method = models.CharField(max_length=50)
     owner_name = models.CharField(max_length=255)
@@ -29,17 +30,16 @@ class Payment(models.Model):
     payment_failures = models.IntegerField()
     has_used_trial = models.BooleanField(default=False)
     payment_status = models.CharField(max_length=255)
-    payment_id = models.CharField(max_length=255, unique=True)
 
     def __str__(self):
         return f"Payment {self.payment_id} - {self.owner_name}"
 
 
 class Invoice(models.Model):
+    invoice_id = models.BigAutoField(primary_key=True)
     paid_amount = models.BigIntegerField(default=0)
     due_date = models.DateTimeField()
     subscription_count = models.BigIntegerField(default=0)
-    invoice_id = models.IntegerField(unique=True)
     subscription_type = models.CharField(max_length=255)
     customer_name = models.CharField(max_length=255)
     customer_email = models.EmailField(max_length=255)
@@ -56,11 +56,11 @@ class Invoice(models.Model):
 
 
 class Coupon(models.Model):
+    coupon_id = models.BigAutoField(primary_key=True)
     free_trial = models.IntegerField()
     is_used = models.BooleanField(default=False)
     code = models.CharField(max_length=50, unique=True)
     user_type = models.CharField(max_length=255) # This should be a ForeignKey to User model
-    coupon_id = models.BigIntegerField(unique=True)
     user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE) # This should be a ForeignKey to User model
     discount = models.IntegerField()
     expiration_date = models.DateField()

@@ -1,7 +1,7 @@
 from django.db import models
 
 class SalePersons(models.Model):
-    sale_person_id = models.BigIntegerField(unique=True)
+    sale_person_id = models.BigAutoField(primary_key=True)
     phone = models.BigIntegerField()
     state = models.CharField(max_length=255)
     country = models.CharField(max_length=255)
@@ -15,7 +15,7 @@ class SalePersons(models.Model):
         return f"SalePerson {self.name} - {self.email}"
 
 class SalesTarget(models.Model):
-    id = models.BigIntegerField(primary_key=True)
+    sales_target_id = models.BigAutoField(primary_key=True)
     sale_person_id = models.ForeignKey('SalePersons', on_delete=models.CASCADE)
     month = models.IntegerField()
     year = models.IntegerField()
@@ -24,7 +24,7 @@ class SalesTarget(models.Model):
     def __str__(self):
         return f"Target for SalePerson {self.sale_person_id} ({self.month}/{self.year})"
 class SalePersonActivityLog(models.Model):
-    sale_person_activity_log_id = models.BigIntegerField(unique=True)
+    sale_person_activity_log_id = models.BigAutoField(primary_key=True)
     sale_person_id = models.ForeignKey('SalePersons', on_delete=models.CASCADE)
     meetings = models.BigIntegerField()
     qualifying_calls = models.BigIntegerField()
@@ -36,7 +36,7 @@ class SalePersonActivityLog(models.Model):
         return f"Activity Log - SalePerson {self.sale_person_id} ({self.date})"
 
 class SalePersonPipeline(models.Model):
-    sale_person_pipeline_id = models.BigIntegerField(unique=True)
+    sale_person_pipeline_id = models.BigAutoField(primary_key=True)
     sale_person_id = models.ForeignKey(SalePersons, on_delete=models.CASCADE)
     qualified_sales = models.BigIntegerField()
     renewals = models.BigIntegerField()

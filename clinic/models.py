@@ -3,7 +3,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 
 # Create your models here.
 class Clinics(models.Model):
-    clinic_id = models.BigIntegerField(unique=True)
+    clinic_id = models.BigAutoField(primary_key=True)
     izzyai_patients = models.BigIntegerField(null=True, blank=True)
     state = models.CharField(max_length=255)
     total_patients = models.BigIntegerField(default=0)
@@ -24,21 +24,21 @@ class Clinics(models.Model):
     
 
 class Disorders(models.Model):
-    disorder_id = models.BigIntegerField(unique=True)
+    disorder_id = models.BigAutoField(primary_key=True)
     disorder_name = models.CharField(max_length=255)
 
     def __str__(self):
         return self.disorder_name
 
 class SessionType(models.Model):
-    session_type_id = models.BigIntegerField(unique=True)
+    session_type_id = models.BigAutoField(primary_key=True)
     type_name = models.CharField(max_length=255)
 
     def __str__(self):
         return self.type_name
 
 class ClinicAppointments(models.Model):
-    appointment_id= models.BigIntegerField(unique=True)
+    appointment_id= models.BigAutoField(primary_key=True)
     #SlpID = models.BigIntegerField(null=True, blank=True)
     slp_id = models.ForeignKey('slp.Slps', on_delete=models.CASCADE)
     #ClinicID = models.BigIntegerField(null=True, blank=True)
@@ -57,7 +57,7 @@ class ClinicAppointments(models.Model):
         return self.appointment_id
 
 class ClinicUserReminders(models.Model):
-    reminder_id= models.BigIntegerField(unique=True)
+    reminder_id= models.BigAutoField(primary_key=True)
     reminder_to= models.CharField(max_length=255)
     date=models.DateTimeField(null=False, blank=False)
     is_sent= models.BooleanField(default=False)
@@ -73,7 +73,7 @@ class ClinicUserReminders(models.Model):
 
 
 class Tasks(models.Model):
-    task_id = models.BigIntegerField(unique=True)
+    task_id = models.BigAutoField(primary_key=True)
     #clinic_id = models.BigIntegerField(null=True, blank=True)
     clinic_id = models.ForeignKey(Clinics, on_delete=models.CASCADE)
     status = models.CharField(max_length=255)
@@ -86,8 +86,8 @@ class Tasks(models.Model):
         return self.task_name
 
 class Sessions(models.Model):
+    session_id = models.BigAutoField(primary_key=True)
     session_status = models.CharField(max_length=255)
-    session_id = models.BigIntegerField(unique=True)
     #user_id = models.BigIntegerField(unique=True)
     user_id = models.ForeignKey('authentication.CustomUser',on_delete=models.CASCADE)
     #session_type_id = models.BigIntegerField(null=True, blank=True)
@@ -104,7 +104,7 @@ class Sessions(models.Model):
 
 
 class DemoRequested(models.Model):
-    demo_request_id = models.BigIntegerField(unique=True)
+    demo_request_id = models.BigAutoField(primary_key=True)
     clinic_name = models.CharField(max_length=255)
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
@@ -120,7 +120,7 @@ class DemoRequested(models.Model):
         return self.first_name
 
 class PatientFiles(models.Model):
-    file_id = models.BigIntegerField(unique=True)
+    file_id = models.BigAutoField(primary_key=True)
     file_name = models.CharField(max_length=255)
     document_type = models.CharField(max_length=255)
     diagnosis_name = models.CharField(max_length=255)
@@ -135,7 +135,7 @@ class PatientFiles(models.Model):
 
 
 class TherapyData(models.Model):
-    therapy_data_id = models.BigIntegerField(unique=True)
+    therapy_data_id = models.BigAutoField(primary_key=True)
     objective = models.CharField(max_length=255,null=False,blank=False)
     patient_name = models.CharField(max_length=255,null=False,blank=False)
     submit_date = models.DateTimeField(null=False, blank=False)
@@ -160,7 +160,7 @@ class TherapyData(models.Model):
 
 
 class TreatmentData(models.Model):
-    treatment_data_id = models.BigIntegerField(unique=True)
+    treatment_data_id = models.BigAutoField(primary_key=True)
     interventions = models.CharField(max_length=255)
     diagnosis_name = models.CharField(max_length=255)
     therapist_name = models.CharField(max_length=255)
@@ -178,7 +178,7 @@ class TreatmentData(models.Model):
     
 
 class AssessmentResults(models.Model):
-    assessment_id = models.BigIntegerField(unique=True)
+    assessment_id = models.BigAutoField(primary_key=True)
     #user_id = models.BigIntegerField(unique=True)
     user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
     #session_id = models.BigIntegerField()

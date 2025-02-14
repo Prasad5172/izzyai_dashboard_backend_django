@@ -22,9 +22,8 @@ class CustomUserManager(BaseUserManager):
 
 # Custom User Model
 class CustomUser(AbstractUser):
+    user_id = models.BigAutoField(primary_key=True)
     email = models.EmailField(unique=True)
-    user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
     warning_count = models.IntegerField(default=0)
     is_apple_user = models.BooleanField(default=False)
     is_google_user = models.BooleanField(default=False)
@@ -57,6 +56,7 @@ class CustomUser(AbstractUser):
 
 # User Profile Model
 class UserProfile(models.Model):
+    profile_id = models.BigAutoField(primary_key=True)
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
     clinic_id = models.BigIntegerField(null=True, blank=True)
     full_name = models.CharField(max_length=255)
@@ -67,7 +67,6 @@ class UserProfile(models.Model):
     patient_status = models.CharField(max_length=255)
     state = models.CharField(max_length=255)
     status = models.CharField(max_length=255)
-    profile_id = models.IntegerField(unique=True)
     slp_id = models.ForeignKey('slp.Slps', on_delete=models.CASCADE)
     avatar_id = models.IntegerField(null=True, blank=True)
     face_authentication_state = models.BooleanField(default=False)
@@ -94,8 +93,8 @@ class UserFiles(models.Model):
 
 # User Exercises Model
 class UserExercises(models.Model):
+    user_exercise_id = models.BigAutoField(primary_key=True)
     total_questions = models.IntegerField()
-    user_exercise_id = models.IntegerField(unique=True)
     level_name = models.CharField(max_length=255)
     world_id = models.IntegerField()
     sound_id = models.IntegerField()
@@ -118,12 +117,12 @@ class UserExercises(models.Model):
 
 # Users Insurance Model
 class UsersInsurance(models.Model):
+    insurance_id = models.BigAutoField(primary_key=True)
     cpt_number = models.CharField(max_length=255)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     insurance_provider = models.CharField(max_length=255)
     insurance_status = models.CharField(max_length=255)
     policy_number = models.BigIntegerField()
-    insurance_id = models.BigIntegerField(unique=True)
     claim_date = models.DateField()
 
     def __str__(self):
