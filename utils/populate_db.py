@@ -4,22 +4,24 @@ from authentication.models import CustomUser, UserProfile,UserFiles,UserExercise
 from clinic.models import Clinics, Disorders, Sessions, SessionType,ClinicAppointments,ClinicUserReminders,DemoRequested,PatientFiles,Tasks,TherapyData,AssessmentResults,TreatmentData
 from slp.models import Slps,SlpAppointments  # Assuming `Slps` model exists
 from sales_person.models import SalePersons  # Assuming `SalePersons` model exists
-from payment.models import Subscriptions,SalesTarget,SalePersonActivityLog,SalePersonPipeline  # Assuming `Subscriptions` model exists
+from payment.models import Subscriptions  # Assuming `Subscriptions` model exists
 from sales_director.models import SalesDirector ,Sales # Assuming `SalesDirector` model exists,
+from sales_person.models import SalesTarget,SalePersonActivityLog,SalePersonPipeline
 fake = Faker()
 
 def create_users(n=10):
     users = []
-    for _ in range(n):
+    for i in range(n):
         user = CustomUser.objects.create(
             username=fake.user_name(),
             email=fake.email(),
-            user_id=random.randint(1000, 9999),
+            user=i,
             password_hash=fake.password(),
             user_type=random.choice(["admin", "slp", "sale_person","clinic","sales_director"]),
             verified=fake.boolean(),
         )
         users.append(user)
+    print(users)
     return users
 
 def create_profiles(users):
@@ -43,9 +45,9 @@ def create_profiles(users):
 
 def create_clinics(n=5):
     clinics = []
-    for _ in range(n):
+    for i in range(n):
         clinic = Clinics.objects.create(
-            clinic_id=random.randint(1000, 9999),
+            clinic_id=i,
             clinic_name=fake.company(),
             address=fake.address(),
             email=fake.email(),
@@ -61,9 +63,9 @@ def create_clinics(n=5):
 
 def create_slps(n=10):
     slps = []
-    for _ in range(n):
+    for i in range(n):
         slp = Slps.objects.create(
-            slp_id=random.randint(1000, 9999),
+            slp_id=i,
             profile_image_path=fake.image_url(),
             status=random.choice(["Active", "Inactive"]),
             country=fake.country(),
@@ -79,9 +81,9 @@ def create_slps(n=10):
 
 def create_slp_appointments(n=10):
     slp_appointments = []
-    for _ in range(n):
+    for i in range(n):
         slp_appointment = SlpAppointments.objects.create(
-            appointment_id=random.randint(1000, 9999),
+            appointment_id=i,
             disorder_id=Disorders.objects.order_by("?").first(),
             slp_id=Slps.objects.order_by("?").first(),
             user_id=CustomUser.objects.order_by("?").first(),
@@ -96,9 +98,9 @@ def create_slp_appointments(n=10):
 
 def create_sale_persons(n=10):
     sale_persons = []
-    for _ in range(n):
+    for i in range(n):
         sale_person = SalePersons.objects.create(
-            sale_person_id=random.randint(1000, 9999),
+            sale_person_id=i,
             phone=random.randint(1000000000, 9999999999),
             state=fake.state(),
             country=fake.country(),
@@ -113,9 +115,9 @@ def create_sale_persons(n=10):
 
 def create_sales_targets(n=10):
     sales_targets = []
-    for _ in range(n):
+    for i in range(n):
         sales_target = SalesTarget.objects.create(
-            id=random.randint(1000, 9999),
+            id=i,
             sale_person_id=SalePersons.objects.order_by("?").first(),
             month=random.randint(1, 12),
             year=random.randint(2010, 2020),
@@ -125,9 +127,9 @@ def create_sales_targets(n=10):
     return sales_targets
 def create_sale_person_activity_logs(n=10):
     sale_person_activity_logs = []
-    for _ in range(n):
+    for i in range(n):
         sale_person_activity_log = SalePersonActivityLog.objects.create(
-            sale_person_activity_log_id=random.randint(1000, 9999),
+            sale_person_activity_log_id=i,
             sale_person_id=SalePersons.objects.order_by("?").first(),
             meetings=random.randint(1, 10),
             qualifying_calls=random.randint(1, 10),
@@ -140,9 +142,9 @@ def create_sale_person_activity_logs(n=10):
 
 def create_sale_person_pipelines(n=10):
     sale_person_pipelines = []
-    for _ in range(n):
+    for i in range(n):
         sale_person_pipeline = SalePersonPipeline.objects.create(
-            sale_person_pipeline_id=random.randint(1000, 9999),
+            sale_person_pipeline_id=i,
             sale_person_id=SalePersons.objects.order_by("?").first(),
             qualified_sales=random.randint(1, 10),
             renewals=random.randint(1, 10),
@@ -155,9 +157,9 @@ def create_sale_person_pipelines(n=10):
 
 def create_sales_directors(n=10):
     sales_directors = []
-    for _ in range(n):
+    for i in range(n):
         sales_director = SalesDirector.objects.create(
-            sales_director_id=random.randint(1000, 9999),
+            sales_director_id=i,
             user_id=CustomUser.objects.order_by("?").first(),
             department=fake.company(),
             designation=fake.job(),
@@ -167,9 +169,9 @@ def create_sales_directors(n=10):
 
 def create_sales(n=10):
     sales = []
-    for _ in range(n):
+    for i in range(n):
         sale = Sales.objects.create(
-            sales_id=random.randint(1000, 9999),
+            sales_id=i,
             sale_person_id=SalePersons.objects.order_by("?").first(),
             subscription_count=random.randint(1, 10),
             commission_percent=random.randint(1, 10),
@@ -180,25 +182,6 @@ def create_sales(n=10):
         sales.append(sale)
     return sales
 
-def create_clinics(n=5):
-    clinics = []
-    for _ in range(n):
-        clinic = Clinics.objects.create(
-            clinic_id=random.randint(1000, 9999),
-            clinic_name=fake.company(),
-            address=fake.address(),
-            email=fake.email(),
-            phone=random.randint(1000000000, 9999999999),
-            ein_number=random.randint(100000, 999999),
-            state=fake.state(),
-            slp_count = random.randint(1, 10),
-            total_patients = random.randint(1, 100),
-            country=fake.country(),
-            sale_person_id=SalePersons.objects.order_by("?").first(),
-            user_id=CustomUser.objects.order_by("?").first(),
-        )
-        clinics.append(clinic)
-    return clinics
 
 def create_disorders(n=5):
     disorders = []
@@ -223,9 +206,9 @@ def create_session_types(n=5):
     return session_types
 
 def create_sessions(users, disorders):
-    for _ in range(10):
+    for i in range(10):
         Sessions.objects.create(
-            session_id=random.randint(1000, 9999),
+            session_id=i,
             session_status=random.choice(["Completed", "quick_assessment_status"]),
             user_id=random.choice(users),
             session_type_id=SessionType.objects.order_by("?").first(),
@@ -272,9 +255,9 @@ def create_user_exercises(n=10):
     return user_exercises
 def create_clinic_appointments(n=10):
     clinic_appoinments = []
-    for _ in range(n):
+    for i in range(n):
         clinic_appoinment = ClinicAppointments.objects.create(
-            appointment_id=random.randint(1000, 9999),
+            appointment_id=i,
             slp_id=Slps.objects.order_by("?").first(),
             clinic_id=Clinics.objects.order_by("?").first(),
             session_type=random.choice(["Initial", "Follow-up"]),
@@ -305,9 +288,9 @@ def create_users_insurance(n=10):
 
 def clinic_user_reminders(n=10):
     clinic_user_reminders = []
-    for _ in range(n):
+    for i in range(n):
         clinic_user_reminder = ClinicUserReminders.objects.create(
-            reminder_id=random.randint(1000, 9999),
+            reminder_id=i,
             reminder_to=fake.name(),
             date=fake.date_this_year(),
             is_sent=fake.boolean(),
@@ -321,9 +304,9 @@ def clinic_user_reminders(n=10):
 
 def create_tasks(n=10):
     tasks = []
-    for _ in range(n):
+    for i in range(n):
         task = Tasks.objects.create(
-            task_id=random.randint(1000, 9999),
+            task_id=i,
             clinic_id=Clinics.objects.order_by("?").first(),
             status=random.choice(["Active", "Inactive"]),
             task_name=fake.sentence(),
@@ -355,7 +338,7 @@ def create_patient_files(n=10):
     patient_files = []
     for i in range(n):
         patient_file = PatientFiles.objects.create(
-            file_id=random.randint(1000, 9999),
+            file_id=i,
             file_name=fake.file_name(),
             document_type = fake.uri_extension(),
             diagnosis_name = fake.name(),
@@ -420,6 +403,26 @@ def run():
     create_clinics(5)
     disorders = create_disorders(5)
     create_sessions(users, disorders)
+    create_user_files()
+    create_user_exercises()
+    create_clinic_appointments()
+    create_users_insurance()
+    create_slps()
+    create_slp_appointments()
+    create_sale_persons()
+    create_sales_targets()
+    create_sale_person_activity_logs()
+    create_sale_person_pipelines()
+    create_sales_directors()
+    create_sales()
+    clinic_user_reminders()
+    create_session_types()
+    create_tasks()
+    create_demo_requests()
+    create_patient_files()
+    create_assessment_results()
+    crete_therapy_data()
+    create_treatment_data()
     print("Fake data inserted successfully!")
 
 if __name__ == "__main__":
