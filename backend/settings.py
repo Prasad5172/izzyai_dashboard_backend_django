@@ -49,7 +49,8 @@ INSTALLED_APPS = [
     'sales_person' ,
     'slp',
     'notifications',
-    'drf_spectacular'
+    'drf_spectacular',
+    'adminer',
 ]
 
 MIDDLEWARE = [

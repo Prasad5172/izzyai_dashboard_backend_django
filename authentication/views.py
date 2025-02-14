@@ -18,6 +18,8 @@ import time
 from slp.models import Slps
 from sales_person.models import SalePersons
 from clinic.models import Clinics
+from sales_director.models import SalesDirector
+from adminer.models import Adminer
 from utils.otp import generate_otp_for_signup
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -114,37 +116,45 @@ class SignupAPIView(APIView):
         password = request.data.get('password')
         source = request.data.get('source', 'unknown')
         user_type = request.data.get('userType' )
+        department = request.data.get('department')
+        designation = request.data.get('designation')
 
         
-        if  not username  or not email or not password or not user_type:
+        if  not username  or not email or not password or not user_type or not source:
             return Response({"error": "One or more required fields are missing"}, status=status.HTTP_400_BAD_REQUEST)
-        if user_type not in ['admin', 'sales_director', 'sales_person' , 'clinic', 'slp']:
+        if user_type not in ['admin', 'sales_director']:
             return Response({"error": "Invalid user type"}, status=status.HTTP_400_BAD_REQUEST)
         
-        if CustomUser.objects.filter(email=email).exists():
+        if CustomUser.objects.filter(email=email , verified=True).exists():
             return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
         
         if CustomUser.objects.filter(username=username).exists():
-            return Response({"error": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        otp = random.randint(100000, 999999)
+            return Response({"error": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)             
         user = CustomUser.objects.create(
             username=username,
             email=email,
             password_hash=password,
-            otp_for_signup=otp,
             is_otp_verified=False,
             is_setup_profile=False,
             source=source,
             user_type=user_type
-        )
-        
-        send_mail(
-                subject="Your OTP Code",
-                message=f"Your OTP code is {otp}.",
-                from_email="your_email@example.com",
-                recipient_list=[email],
-        )      
+        )  
+        if( user_type == 'admin'):
+            adminer = Adminer.objects.create(
+                user_id = user.user_id
+                department = department,
+                designation = designation
+            )
+        elif( user_type == 'sales_director'):
+            sales_director = SalesDirector.objects.create(
+                user_id = user.user_id
+                department = department,
+                designation = designation
+            )
+        else:
+            return Response({"error": "Invalid user type"}, status=status.HTTP_400_BAD_REQUEST)
+
+
         access_token = get_tokens_for_user(user)
         
         return Response({
@@ -183,10 +193,10 @@ class SlpSignupAPIView(APIView):
         if not clinic_name or not slp_name or not phone or not state or not country or not sale_person_id or not slp_count or not total_patient or not user_patient or not ein_number:
             return Response({"error": "One or more required fields are missing"}, status=status.HTTP_400_BAD_REQUEST)
 
-        if CustomUser.objects.filter(email=email).exists():
+        if CustomUser.objects.filter(email=email,   verified=True).exists():
             return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
-        if CustomUser.objects.filter(username=username).exists():
+        if CustomUser.objects.filter(username=username ).exists():
             return Response({"error": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -251,7 +261,7 @@ class Sales_Person_SignupAPIView(APIView):
             return Response({"error": "Invalid role"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Check if email already exists
-        if CustomUser.objects.filter(email=email).exists():
+        if CustomUser.objects.filter(email=email , verified=True).exists():
             return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Check if username already exists
