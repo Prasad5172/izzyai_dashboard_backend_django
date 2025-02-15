@@ -11,10 +11,11 @@ import time
 from slp.models import Slps,SlpAppointments
 from authentication.models import UserProfile , CustomUser
 from rest_framework.permissions import IsAuthenticated
-from clinic.models import Clinics , ClinicAppointments , Tasks , TherapyData
+from clinic.models import Clinics , ClinicAppointments , Tasks , TherapyData,TreatmentData
+from django.shortcuts import get_object_or_404
 
 class SlpApiView(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get(self , request , SlpID ):
 
@@ -632,60 +633,6 @@ class SlpAppointmentsGoal(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# class SlpTherapy(APIView):
-#     premission_classes = [IsAuthenticated]
-#     def post(self , request):
-#         """
-#         Adds therapy data for a specific user and session.
-
-#         This endpoint allows a therapist (SLP) to submit therapy data for a specific patient. The data includes objective, patient information, therapy resources, performance, condition, responses, and more.
-
-#         Args:
-#         - None (request body required)
-
-#         Request Body:
-#             - UserID (int): The unique identifier of the user (patient).
-#             - SlpID (int): The unique identifier of the therapist (SLP).
-#             - Objective (str): The objective of the therapy session.
-#             - PatientName (str): The full name of the patient.
-#             - SubmitDate (str): The date the therapy data was submitted (in DD-MM-YYYY format).
-#             - SlpName (str): The full name of the therapist (SLP).
-#             - Resources (str): Resources used during the therapy session.
-#             - Performance (str): The performance assessment of the patient.
-#             - Condition (str): The patient's condition during the session.
-#             - Criterion (str): The criterion for the therapy session.
-#             - ResponseOne (str): Response to the first question.
-#             - ResponseTwo (str): Response to the second question.
-#             - ResponseThree (str): Response to the third question.
-#             - ResponseFour (str): Response to the fourth question.
-#             - ResponseFive (str): Response to the fifth question.
-
-#         Returns:
-#         JSON:
-#             - 201 Created: Success message indicating the therapy data was added.
-#             Example: {"message": "Therapy data added successfully!"}
-#             - 400 Bad Request: If required fields are missing or date format is invalid.
-#             Example: {"error": "Invalid date format. Please use DD-MM-YYYY."}
-#             - 500 Internal Server Error: If there is a database issue or any other error occurs.
-#             Example: {"error": "Error occurred: Error message"}
-#         """
-#         try:
-#             UserID = request.data.get('UserID')
-#             SlpID = request.data.get('SlpID')
-#             Objective = request.data.get('Objective')
-#             PatientName = request.data.get('PatientName')
-#             SubmitDate = request.data.get('SubmitDate')
-#             SlpName = request.data.get('SlpName')
-#             Resources = request.data.get('Resources')
-#             Performance = request.data.get('Performance')
-#             Condition = request.data.get('Condition')
-#             Criterion = request.data.get('Criterion')
-#             ResponseOne = request.data.get('ResponseOne')
-#             ResponseTwo = request.data.get('ResponseTwo')
-#             ResponseThree = request.data.get('ResponseThree')
-#             ResponseFour = request.data.get('ResponseFour')
-#             ResponseFive = request.data.get('ResponseFive')
-
 class SlpReport(APIView):
     def get(self , request , slp_id  , time_filter = "daily" ):
         """
@@ -776,5 +723,177 @@ class SlpReport(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        
+class SlpTherapyPatients(APIView):
+    def get(self , request , slp_id ):
+        """
+        Retrieves a list of patients associated with a specific Speech-Language Pathologist (SLP) based on SlpID.
 
+        This endpoint allows retrieving patient details such as UserID, FullName, and Age for all patients who are assigned to a specific SLP, identified by their SlpID.
+
+        Args:
+        - slp_id (int): The unique identifier of the Speech-Language Pathologist (SLP).
+
+        Returns:
+        JSON:
+            - 200 OK: Success message with a list of patients' details for the given SlpID.
+            Example:
+            [
+                {"UserID": 1, "FullName": "John Doe", "Age": 30},
+                {"UserID": 2, "FullName": "Jane Smith", "Age": 25}
+            ]
+            - 404 Not Found: If no patients are found for the given SlpID.
+            Example: {"message": "No patients found for the given SlpID"}
+            - 500 Internal Server Error: If there is a database issue or any other error occurs.
+            Example: {"error": "Error occurred: Error message"}
+        """ 
+        try:
+            patients = UserProfile.objects.filter(slp_id=slp_id).values('user_id', 'full_name', 'age')
+            if not patients:
+                return Response({'message': 'No patients found for the given SlpID'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(list(patients), status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    def post(self , request):
+        """
+        Adds therapy data for a specific user and session.
+
+        This endpoint allows a therapist (SLP) to submit therapy data for a specific patient. The data includes objective, patient information, therapy resources, performance, condition, responses, and more.
+
+        Args:
+        - None (request body required)
+
+        Request Body:
+            - UserID (int): The unique identifier of the user (patient).
+            - SlpID (int): The unique identifier of the therapist (SLP).
+            - Objective (str): The objective of the therapy session.
+            - PatientName (str): The full name of the patient.
+            - SubmitDate (str): The date the therapy data was submitted (in DD-MM-YYYY format).
+            - SlpName (str): The full name of the therapist (SLP).
+            - Resources (str): Resources used during the therapy session.
+            - Performance (str): The performance assessment of the patient.
+            - Condition (str): The patient's condition during the session.
+            - Criterion (str): The criterion for the therapy session.
+            - ResponseOne (str): Response to the first question.
+            - ResponseTwo (str): Response to the second question.
+            - ResponseThree (str): Response to the third question.
+            - ResponseFour (str): Response to the fourth question.
+            - ResponseFive (str): Response to the fifth question.
+
+        Returns:
+        JSON:
+            - 201 Created: Success message indicating the therapy data was added.
+            Example: {"message": "Therapy data added successfully!"}
+            - 400 Bad Request: If required fields are missing or date format is invalid.
+            Example: {"error": "Invalid date format. Please use DD-MM-YYYY."}
+            - 500 Internal Server Error: If there is a database issue or any other error occurs.
+            Example: {"error": "Error occurred: Error message"}
+        """
+        try:
+            userid = request.data.get('UserID')  # Extract UserID
+            slp_id = request.data.get('SlpID')   # Extract SlpID
+            objective = request.data.get('Objective')
+            patient_name = request.data.get('PatientName')
+            submit_date = request.data.get('SubmitDate')
+            slp_name = request.data.get('SlpName')
+            resources = request.data.get('Resources')
+            performance = request.data.get('Performance')  # New field
+            condition = request.data.get('Condition')      # New field
+            criterion = request.data.get('Criterion')      # New field
+            response_one = request.data.get('ResponseOne')
+            response_two = request.data.get('ResponseTwo')
+            response_three = request.data.get('ResponseThree')
+            response_four = request.data.get('ResponseFour')
+            response_five = request.data.get('ResponseFive')
+
+            # Check if required fields are missing
+            if not userid or not slp_id or not objective or not patient_name or not submit_date or not slp_name or not resources:
+                return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Check if date format is valid
+            try:
+                datetime.strptime(submit_date, '%d-%m-%Y')
+            except ValueError:
+                return Response({'error': 'Invalid date format. Please use DD-MM-YYYY.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Create TherapyData object
+            therapy_data = TherapyData(
+                user_id=userid,
+                slp_id=slp_id,
+                objective=objective,
+                patient_name=patient_name,
+                submit_date=submit_date,
+                slp_name=slp_name,
+                resources=resources,
+                performance=performance,
+                condition=condition,
+                criterion=criterion,
+                response_one=response_one,
+                response_two=response_two,
+                response_three=response_three,
+                response_four=response_four,
+                response_five=response_five
+            )
+            therapy_data.save()
+            return Response({'message': 'Therapy data added successfully!'}, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    
+
+class SlpTreatment(APIView):
+    premission_classes = [IsAuthenticated]
+    def post(self , request):
+        """
+        Creates a new treatment record in the TreatmentData table.
+
+        This endpoint allows the creation of a new treatment record by storing patient details, diagnosis, therapist information, treatment goals, and interventions.
+
+        Args:
+        - PatientName (str): The name of the patient.
+        - PatientAge (str): The age of the patient.
+        - DiagnosisName (str): The name of the patient's diagnosis.
+        - TherapistName (str): The name of the therapist treating the patient.
+        - Date (str): The treatment date in DD-MM-YYYY format.
+        - Goal (str): The treatment goal for the patient.
+        - Interventions (list): A list of interventions to be used in the treatment.
+        - UserID (str): The unique identifier of the user associated with the treatment record.
+        - SlpID (str): The unique identifier of the Speech-Language Pathologist (SLP) assigned to the treatment.
+
+        Returns:
+        JSON:
+            - 201 Created: Success message if treatment data is created successfully.
+            Example: {"message": "Treatment data created successfully."}
+            - 400 Bad Request: If any required field is missing.
+            Example: {"error": "All required fields must be provided."}
+            - 500 Internal Server Error: If there is a database issue or any other error occurs.
+            Example: {"error": "Error occurred: Error message"}
+
+        """
+        try : 
+            patient_name = request.data.get('PatientName')
+            patient_age = request.data.get('PatientAge')
+            diagnosis_name = request.data.get('DiagnosisName')
+            therapist_name = request.data.get('TherapistName')
+            date = request.data.get('Date')
+            goal = request.data.get('Goal')
+            interventions = request.data.getlist('Interventions')  
+            user_id = request.data.get('UserID')  
+            slp_id = request.data.get('SlpID') 
+            # Check that all required fields are provided
+            if not patient_name or not patient_age or not diagnosis_name or not therapist_name or not date or not goal or not interventions or not user_id or not slp_id:
+                return Response({'error': 'All required fields must be provided.'}, status=status.HTTP_400_BAD_REQUEST)
+            treatment_data = TreatmentData.objects.create(
+                patient_name=patient_name,
+                patient_age=patient_age,
+                diagnosis_name=diagnosis_name,
+                therapist_name=therapist_name,
+                date=date,
+                goal=goal,
+                interventions=interventions,
+                user_id=user_id,
+                slp_id=slp_id
+            )
+            return Response({'message': 'Treatment data created successfully.'}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)          

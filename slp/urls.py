@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path , include
-from .views import SlpApiView ,SlpUsersLog , SlpPatients,SlpAppointments , SlpReschedule,SlpTasks,SlpAppointmentsGoal
+from .views import SlpApiView ,SlpUsersLog , SlpPatients,SlpAppointments , SlpReschedule,SlpTasks,SlpAppointmentsGoal,SlpTherapyPatients  ,SlpTreatment
 urlpatterns = [
    
    path('get_slp_details/<int:SlpID>' , SlpApiView.as_view() , name="slp_details"),
@@ -30,6 +30,9 @@ urlpatterns = [
    path('/reschedule_appointment/<int:appointment_id>' ,SlpReschedule.as_view() , name="slp_reschedule_appointment"),
    path('get_tasks_by_slp' , SlpTasks.as_view() , name="slp_tasks"),
    path('update_task_status' , SlpTasks.as_view() , name="slp_update_task"),
-   path('/get_appointments_goals/<int:slp_id>' , SlpAppointmentsGoal.as_view() , name="slp_appointment_goals")
+   path('/get_appointments_goals/<int:slp_id>' , SlpAppointmentsGoal.as_view() , name="slp_appointment_goals"),
+   path('get_patients_by_slp/<int:slp_id>' , SlpTherapyPatients.as_view() , name= "slp_treatment_patients"),
+   path('add_therapy_data/' ,SlpTherapyPatients.as_view() , name="slp_add_therapy_data"),
+   path('create_treatment_data/', SlpTreatment.as_view() , name="slp_treatment") 
 
 ]
