@@ -87,7 +87,7 @@ class Tasks(models.Model):
 
 class Sessions(models.Model):
     session_id = models.BigAutoField(primary_key=True)
-    session_status = models.CharField(max_length=255)
+    session_status = models.CharField(max_length=255,null=True, blank=True)
     #user_id = models.BigIntegerField(unique=True)
     user_id = models.ForeignKey('authentication.CustomUser',on_delete=models.CASCADE)
     #session_type_id = models.BigIntegerField(null=True, blank=True)
@@ -95,7 +95,7 @@ class Sessions(models.Model):
     start_time = models.DateTimeField(null=False, blank=False)
     end_time = models.DateTimeField(null=False, blank=False)
     #disorder_id = models.BigIntegerField(null=True, blank=True)
-    disorder_id = models.ForeignKey(Disorders, on_delete=models.CASCADE)
+    disorder_id = models.ForeignKey(Disorders, on_delete=models.CASCADE,null=True, blank=True)
 
     def __str__(self):
         return f"Session{self.session_id} - {self.disorder} "

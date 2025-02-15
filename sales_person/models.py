@@ -5,7 +5,7 @@ class SalePersons(models.Model):
     phone = models.BigIntegerField()
     state = models.CharField(max_length=255)
     country = models.CharField(max_length=255)
-    status = models.CharField(max_length=255)
+    status = models.CharField(max_length=255)#redundant
     user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
     subscription_id = models.ForeignKey('payment.Subscriptions', on_delete=models.CASCADE)
     subscription_count = models.BigIntegerField(default=0)

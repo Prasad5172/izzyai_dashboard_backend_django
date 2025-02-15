@@ -3,7 +3,7 @@ from django.db import models
 class Slps(models.Model):
     slp_id = models.BigAutoField(primary_key=True)
     profile_image_path = models.TextField(null=True, blank=True)
-    status = models.CharField(max_length=50)
+    status = models.CharField(max_length=50)#redundant
     country = models.CharField(max_length=255)
     state = models.CharField(max_length=255)
     email = models.EmailField(unique=True)
@@ -33,3 +33,4 @@ class SlpAppointments(models.Model):
 
     def __str__(self):
         return self.appointment_id
+    

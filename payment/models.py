@@ -21,7 +21,6 @@ class Payment(models.Model):
     payment_date = models.DateTimeField()
     amount = models.FloatField()
     #user_id = models.IntegerField(unique=True)
-    customer_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE, related_name="customer_payment")
     user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE, related_name="user_payment")
     user_payment_id = models.IntegerField(unique=True)
     subscription_start_date = models.DateTimeField()
