@@ -16,7 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path , include
+from .views import SalespersonSalesApiView,SalepersonClincRegister,SalespersonActivityLog , SalespersonPipelineProgress
 urlpatterns = [
-   
+   path('salesperson-sales/' , SalespersonSalesApiView.as_view() , name="salesperson-sales") , 
+   path('salesperson-clinc-register/' , SalepersonClincRegister.as_view() , name="salesperson-clinc-register"),
+   path('salesperson-activity-log/' , SalespersonActivityLog.as_view() , name="salesperson-activity-log"), 
+   path('salesperson-pipeline-progress' , SalespersonPipelineProgress.as_view() , name="salesperson-pipeline-progress")
 
 ]
