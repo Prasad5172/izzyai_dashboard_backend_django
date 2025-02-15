@@ -2,7 +2,7 @@ from django.db import models
 
 class SalePersons(models.Model):
     sale_person_id = models.BigAutoField(primary_key=True)
-    phone = models.BigIntegerField()
+    phone = models.BigIntegerField(default=0)
     state = models.CharField(max_length=255)
     country = models.CharField(max_length=255)
     status = models.CharField(max_length=255)#redundant
@@ -17,20 +17,20 @@ class SalePersons(models.Model):
 class SalesTarget(models.Model):
     sales_target_id = models.BigAutoField(primary_key=True)
     sale_person_id = models.ForeignKey('SalePersons', on_delete=models.CASCADE)
-    month = models.IntegerField()
-    year = models.IntegerField()
-    target = models.BigIntegerField()
+    month = models.IntegerField(null=True, blank=True)
+    year = models.IntegerField(null=True, blank=True)
+    target = models.BigIntegerField(default=0)
 
     def __str__(self):
         return f"Target for SalePerson {self.sale_person_id} ({self.month}/{self.year})"
 class SalePersonActivityLog(models.Model):
     sale_person_activity_log_id = models.BigAutoField(primary_key=True)
     sale_person_id = models.ForeignKey('SalePersons', on_delete=models.CASCADE)
-    meetings = models.BigIntegerField()
-    qualifying_calls = models.BigIntegerField()
-    renewal_calls = models.BigIntegerField()
-    proposals_sent = models.BigIntegerField()
-    date = models.DateTimeField()
+    meetings = models.BigIntegerField(default=0)
+    qualifying_calls = models.BigIntegerField(default=0)
+    renewal_calls = models.BigIntegerField(default=0)
+    proposals_sent = models.BigIntegerField(default=0)
+    date = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Activity Log - SalePerson {self.sale_person_id} ({self.date})"

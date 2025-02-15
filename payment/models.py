@@ -3,7 +3,7 @@ from django.db import models
 
 class Subscriptions(models.Model) : 
     subscription_id = models.BigAutoField(primary_key=True)
-    subscription_price = models.FloatField()
+    subscription_price = models.FloatField(default=0)
     subscription_name = models.CharField(max_length=255)
 
     def __str__(self):
@@ -18,14 +18,14 @@ class Payment(models.Model):
     invoice_id = models.CharField(max_length=255 , unique=True)
     subscription_id = models.ForeignKey('payment.Subscriptions', on_delete=models.CASCADE)  # This should be a ForeignKey to Subscription model
     status = models.CharField(max_length=255)
-    payment_date = models.DateTimeField()
-    amount = models.FloatField()
+    payment_date = models.DateTimeField(null=True, blank=True)
+    amount = models.FloatField(default=0)
     #user_id = models.IntegerField(unique=True)
     user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE, related_name="user_payment")
     user_payment_id = models.IntegerField(unique=True)
-    subscription_start_date = models.DateTimeField()
-    subscription_end_date = models.DateTimeField()
-    payment_failures = models.IntegerField()
+    subscription_start_date = models.DateTimeField(null=True, blank=True)
+    subscription_end_date = models.DateTimeField(null=True, blank=True)
+    payment_failures = models.IntegerField(default=0)
     has_used_trial = models.BooleanField(default=False)
     payment_status = models.CharField(max_length=255)
 
@@ -36,7 +36,7 @@ class Payment(models.Model):
 class Invoice(models.Model):
     invoice_id = models.BigAutoField(primary_key=True)
     paid_amount = models.BigIntegerField(default=0)
-    due_date = models.DateTimeField()
+    due_date = models.DateTimeField(null=True, blank=True)
     subscription_count = models.BigIntegerField(default=0)
     subscription_type = models.CharField(max_length=255)
     customer_name = models.CharField(max_length=255)
@@ -45,8 +45,8 @@ class Invoice(models.Model):
     user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE) #ask jayanth, not present in the pdf
     subscription_id = models.ForeignKey('payment.Subscriptions', on_delete=models.CASCADE) # This should be a ForeignKey to Subscription model
     clinic_id = models.ForeignKey('clinic.Clinics', on_delete=models.CASCADE) # This should be a ForeignKey to Clinic model
-    issue_date = models.DateTimeField()
-    amount = models.BigIntegerField()
+    issue_date = models.DateTimeField(null=True, blank=True)
+    amount = models.BigIntegerField(default=0)
 
     def __str__(self):
         

@@ -66,7 +66,7 @@ class UserProfile(models.Model):
     patient_status = models.CharField(max_length=255)
     state = models.CharField(max_length=255)
     status = models.CharField(max_length=255)
-    slp_id = models.ForeignKey('slp.Slps', on_delete=models.CASCADE,null=True, blank=True)
+    slp_id = models.ForeignKey('slp.Slps', on_delete=models.SET_NULL,null=True, blank=True)
     avatar_id = models.IntegerField(null=True, blank=True)
     face_authentication_state = models.BooleanField(default=False)
     contact_number = models.BigIntegerField(null=True, blank=True)
@@ -94,20 +94,20 @@ class UserFiles(models.Model):
 # User Exercises Model
 class UserExercises(models.Model):
     user_exercise_id = models.BigAutoField(primary_key=True)
-    total_questions = models.IntegerField()
+    total_questions = models.IntegerField(default=0)
     level_name = models.CharField(max_length=255)
-    world_id = models.IntegerField()
-    sound_id = models.IntegerField()
+    world_id = models.IntegerField(null=True, blank=True)
+    sound_id = models.IntegerField(null=True, blank=True)
     session_id = models.ForeignKey('clinic.Sessions', on_delete=models.CASCADE,null=True, blank=True)
     sound_id_list = models.CharField(max_length=255)
     disorder_id = models.ForeignKey('clinic.Disorders', on_delete=models.CASCADE,null=True, blank=True)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     completion_status = models.CharField(max_length=255)
-    exercise_date = models.DateTimeField()
-    score = models.FloatField()
+    exercise_date = models.DateTimeField(null=True,blank=True)
+    score = models.FloatField(default=0)
     emotion = models.CharField(max_length=255)
-    completed_questions = models.IntegerField()
-    sentence_id = models.IntegerField()
+    completed_questions = models.IntegerField(default=0)
+    sentence_id = models.IntegerField(null=True, blank=True)
     game_name = models.CharField(max_length=255)
     world_id_list = models.CharField(max_length=255)
 
@@ -122,8 +122,8 @@ class UsersInsurance(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     insurance_provider = models.CharField(max_length=255)
     insurance_status = models.CharField(max_length=255)
-    policy_number = models.BigIntegerField()
-    claim_date = models.DateField()
+    policy_number = models.BigIntegerField(null=True, blank=True)
+    claim_date = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return f"Insurance {self.insurance_provider} - {self.user.email}"

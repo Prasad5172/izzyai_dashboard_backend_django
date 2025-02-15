@@ -2,8 +2,8 @@ from django.db import models
 class Sales(models.Model):
     sales_id = models.BigAutoField(primary_key=True)
     sale_person_id = models.ForeignKey('sales_person.SalePersons', on_delete=models.CASCADE)
-    subscription_count = models.BigIntegerField()
-    commission_percent = models.BigIntegerField()
+    subscription_count = models.BigIntegerField(default=0)
+    commission_percent = models.BigIntegerField(default=0)
     clinic_id = models.ForeignKey('clinic.Clinics', on_delete=models.CASCADE)
     payment_status = models.CharField(max_length=255)
     subscription_type = models.CharField(max_length=255)
