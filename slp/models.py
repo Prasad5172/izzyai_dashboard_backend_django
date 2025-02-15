@@ -33,3 +33,4 @@ class SlpAppointments(models.Model):
 
     def __str__(self):
         return self.appointment_id
+    

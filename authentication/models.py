@@ -71,6 +71,7 @@ class UserProfile(models.Model):
     face_authentication_state = models.BooleanField(default=False)
     contact_number = models.BigIntegerField(null=True, blank=True)
     dob = models.DateField(null=True, blank=True)
+    profilephoto = models.TextField(null=True, blank=True)
     age = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
 
     def __str__(self):
