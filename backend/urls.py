@@ -28,6 +28,7 @@ urlpatterns = [
     path('' , include('payment.urls')),
     path('' , include('sales_director.urls')),
     path('' , include('sales_person.urls')),
-    path('' , include('slp.urls'))
+    path('' , include('slp.urls')),
+    path('', include('patient.urls')),
 
 ]

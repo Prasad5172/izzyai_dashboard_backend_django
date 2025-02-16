@@ -22,7 +22,7 @@ class SlpAppointments(models.Model):
     appointment_id = models.BigAutoField(primary_key=True)
     disorder_id = models.ForeignKey('clinic.Disorders', on_delete=models.CASCADE)
     #slp_id = models.BigIntegerField(null=True, blank=True)
-    slp_id = models.ForeignKey(Slps, on_delete=models.CASCADE)
+    slp_id = models.ForeignKey('slp.Slps', on_delete=models.CASCADE)
     #user_id = models.BigIntegerField(null=True, blank=True)
     user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
     appointment_date = models.DateTimeField(null=False, blank=False)
@@ -32,5 +32,5 @@ class SlpAppointments(models.Model):
     end_time = models.DateTimeField(null=False, blank=False)
 
     def __str__(self):
-        return self.appointment_id
+        return str(self.appointment_id)
     
