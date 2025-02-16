@@ -96,7 +96,7 @@ def refresh_tokens(refresh_token):
         raise InvalidToken("User not found for the provided token.")
 
 # this is for signup for admin and sales_director
-class SignupAPIView(APIView):
+class AdminAndSaleDirectorSignupAPIView(APIView):
     
     def post(self, request):
         """
@@ -320,7 +320,7 @@ class ClinicSignupAPIView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 #need to test all cases
-class SendOTPView(APIView):
+class SendOTPForSignupView(APIView):
     # permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -432,7 +432,7 @@ class LoginAPIView(APIView):
         password = request.data.get('password')
         print(password)
 
-        user = authenticate(email=email, password=password)
+        user = authenticate(email=email, password=password) #debug showing error if user and password is present in db 
         
         if user is None:
             return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
