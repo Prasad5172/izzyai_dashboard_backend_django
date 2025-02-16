@@ -16,23 +16,26 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path , include
-from .views import SlpApiView ,SlpUsersLog , SlpPatients,SlpAppointments , SlpReschedule,SlpTasks,SlpAppointmentsGoal,SlpTherapyPatients  ,SlpTreatment
+from .views import SlpApiView ,SlpUsersLog , SlpPatients,SlpAppointments , SlpReschedule,SlpTasks,SlpAppointmentsGoal,SlpTherapyPatients  ,SlpTreatment,SlpReport
+
 urlpatterns = [
    
    path('get_slp_details/<int:SlpID>' , SlpApiView.as_view() , name="slp_details"),
    path('update_slp/<int:SlpID>' , SlpApiView.as_view() , name="slp_update") , 
-   path('get_users_logs/<int:SlpID>' , SlpUsersLog.as_view() , name="slp_log"),
+   path('get_users_logs/<int:SlpID>/<str:time_filter>' , SlpUsersLog.as_view() , name="slp_log"),
    path('get_patient/<int:UserID>/' , SlpPatients.as_view() , name="slp_patient") , 
-   path('/update_patient/<int:UserID>/', SlpPatients.as_view() , name="slp_update_patient") ,
-   path('create_slps_appointment' ,SlpAppointments.as_view() , name="slp_create_appointment"),
-   path('/get_slp_appointments_details/<int:slp_id>/' , SlpAppointments.as_view() , name="slp_appointment_details"),
-   path('/status_appointment/<int:appointment_id>/' , SlpAppointments.as_view() , name="slp_attend_appointment"),
-   path('/reschedule_appointment/<int:appointment_id>' ,SlpReschedule.as_view() , name="slp_reschedule_appointment"),
-   path('get_tasks_by_slp' , SlpTasks.as_view() , name="slp_tasks"),
+   path('update_patient/<int:UserID>/', SlpPatients.as_view() , name="slp_update_patient") ,
+   path('create_slps_appointment' ,SlpAppointments.as_view() , name="slp_create_appointment"), #need to test
+   path('get_slp_appointments_details/<int:slp_id>/' , SlpAppointments.as_view() , name="slp_appointment_details"), #need to test
+   path('status_appointment/<int:appointment_id>/' , SlpAppointments.as_view() , name="slp_attend_appointment"),
+   path('reschedule_appointment/<int:appointment_id>' ,SlpReschedule.as_view() , name="slp_reschedule_appointment"),
+   path('get_tasks_by_slp/<int:SlpID>' , SlpTasks.as_view() , name="slp_tasks"),
    path('update_task_status' , SlpTasks.as_view() , name="slp_update_task"),
-   path('/get_appointments_goals/<int:slp_id>' , SlpAppointmentsGoal.as_view() , name="slp_appointment_goals"),
+   path('get_appointments_goals/<int:slp_id>' , SlpAppointmentsGoal.as_view() , name="slp_appointment_goals"), #need to test
    path('get_patients_by_slp/<int:slp_id>' , SlpTherapyPatients.as_view() , name= "slp_treatment_patients"),
    path('add_therapy_data/' ,SlpTherapyPatients.as_view() , name="slp_add_therapy_data"),
-   path('create_treatment_data/', SlpTreatment.as_view() , name="slp_treatment") 
+   path('create_treatment_data/', SlpTreatment.as_view() , name="slp_treatment") ,
+   path('get_reports_by_slp/<int:slp_id>/<str:time_filter>' , SlpReport.as_view() , name="slp_reports"),
+
 
 ]

@@ -13,7 +13,7 @@ from authentication.models import UserProfile , CustomUser
 from rest_framework.permissions import IsAuthenticated
 from clinic.models import Clinics , ClinicAppointments , Tasks , TherapyData,TreatmentData
 from django.shortcuts import get_object_or_404
-
+from datetime import datetime
 class SlpApiView(APIView):
     # permission_classes = [IsAuthenticated]
 
@@ -48,7 +48,13 @@ class SlpApiView(APIView):
         """
         
         try:
-            slp = get_object_or_404(Slps, slp_id=SlpID)
+            slp = Slps.objects.get(slp_id=SlpID)
+            clinic = Clinics.objects.filter(user_id=slp.user_id).first()
+            clinic_name = clinic.clinic_name if clinic else None
+            # count the number of users assigned to the slp
+            users_assigned = UserProfile.objects.filter(user_id=slp.user_id).count()
+            if not clinic_name:
+                clinic_name = "No Clinic Assigned"
             response = {
                 "SlpID": slp.slp_id,
                 "SlpName": slp.slp_name,
@@ -56,8 +62,8 @@ class SlpApiView(APIView):
                 "Email": slp.email,
                 "Country": slp.country,
                 "State": slp.state,
-                "ClinicName": slp.clinic_name,
-                "UsersAssigned": slp.users_assigned,
+                "ClinicName": clinic_name,
+                "UsersAssigned": users_assigned,
             }
             user_profile = UserProfile.objects.get(user_id=slp.user_id)
             response["ProfilePicture"] = user_profile.profilephoto
@@ -302,7 +308,8 @@ class SlpPatients(APIView):
             "Dob": user_profile.dob,
             "Gender": user_profile.gender,
             "Country": user_profile.country,
-            "Status": user_profile.status
+            "Status": user_profile.status , 
+            "user_type": user.user_type
         }}, status=status.HTTP_200_OK)
     
     
@@ -370,15 +377,15 @@ class SlpAppointments(APIView):
             Example: {"error": "Error message"}
         """
         try:
-            appointments = SlpAppointments.objects.filter(slp_id=SlpID)
+            appointments = SlpAppointments.objects.filter(slp__id=SlpID)
             data = []
             for appointment in appointments:
                 data.append({
                     "AppointmentID": appointment.appointment_id,
                     "AppointmentDate": appointment.appointment_date,
-                    "StartTime": appointment.appointment_start ,
-                    "EndTime": appointment.appointment_end,
-                    "AppointmentStatus": appointment.appointment_status
+                    "StartTime": appointment.start_time ,
+                    "EndTime": appointment.start_time,
+                    "AppointmentStatus": appointment.end_time
                 })
             return Response(data, status=status.HTTP_200_OK)
         except Exception as e:
@@ -516,8 +523,8 @@ class SlpTasks(APIView):
                     "TaskName": task.task_name,
                     "Description": task.description,
                     "Status": task.status,
-                    "SlpID": task.slp_id,
-                    "ClinicID": task.clinic_id
+                    "SlpID": task.slp_id_id,  
+                    "ClinicID": task.clinic_id_id  
                 })
             return Response({"SlpID": SlpID, "Tasks": data}, status=status.HTTP_200_OK)
         except Exception as e:
