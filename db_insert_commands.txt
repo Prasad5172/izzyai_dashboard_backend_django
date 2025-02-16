@@ -1,0 +1,2 @@
+not using local psql,for testing we are using db.sqlite3
+run command python3 create_task.py
