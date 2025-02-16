@@ -66,7 +66,7 @@ def create_user_files(users):
     for i in range(100):
         user_file = UserFiles.objects.create(
             file_id=i,
-            role=random.choice(["admin", "slp", "sale_person","clinic","sales_director"]),
+            role=random.choice(["admin", "slp", "sale_person","clinic","sales_director" , "Patient"]),
             file_path=fake.file_path(),
             user=users[i],
             file_name=fake.file_name(),

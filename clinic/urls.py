@@ -16,7 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path , include
+from .views import ClinicPatients
 urlpatterns = [
    
+   path('/get_patient_details/<int:clinic_id>' , ClinicPatients.as_view() , name="get_patient_details") 
 
 ]
