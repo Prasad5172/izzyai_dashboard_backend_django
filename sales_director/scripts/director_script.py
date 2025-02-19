@@ -17,15 +17,16 @@ def run():
 
     salespersons_ = SalePersons.objects.annotate(
         active_clinics_count=Count("clinics", distinct=True),
-        total_revenue=Sum(
+        total_revenue=Coalesce(Sum(
                 "clinics__user_profiles__user__payments__amount",
                 filter=Q(clinics__user_profiles__user__payments__payment_status="Paid")
-            ),
+            ),Value(0.0, output_field=FloatField())),
         total_users=Count("clinics__user_profiles", distinct=True),
         commission_amount=Coalesce(
                             Sum(
                                 F('sales__subscription_count') * Value(50.0, output_field=FloatField()) *
                                 (F('sales__commission_percent') / 100.0),
+                                distinct=True,
                                 output_field=FloatField()
                             ),
                             Value(0.0, output_field=FloatField())

@@ -16,7 +16,7 @@ from django.db.models.functions import Coalesce
 from datetime import timedelta
 from django.utils.timezone import now
 from authentication.models import CustomUser ,UserProfile
-from clinic.models import Clinics
+from clinic.models import Clinics,DemoRequested
 from payment.models import Payment
 # Create your views here.
 class ClinicPatients(APIView):
@@ -98,3 +98,20 @@ class GetClinicsWithIdName(APIView):
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'} , status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+#/demo_requests,GET
+class DemoRequests(APIView):
+    def get(self , request):
+        try:
+            saleperson_id = request.GET.get('SlpId', None) 
+            # Fetch the salesperson object
+            if(saleperson_id is None):
+                result = DemoRequested.objects.all().values()
+                return Response({'demo_requests': list(result)}, status=status.HTTP_200_OK)
+            
+            salesperson_demo_requests = DemoRequested.objects.filter(sale_person_id=saleperson_id).first()
+            if not salesperson_demo_requests.exists():
+                return Response({'demo_requests': [], "message": "No demo requests found"}, status=status.HTTP_200_OK)
+            return Response({'demo_requests': list(salesperson_demo_requests.values())}, status=status.HTTP_200_OK) 
+
+        except Exception as e:
+            return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

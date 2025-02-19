@@ -24,49 +24,50 @@ class SalesPersonDetails(APIView):
         Fetches an overview of all salespersons, including clinic count, user count, sales per clinic, and revenue.
         """
         try:
-            salespersons_ = SalePersons.objects.annotate(
+            salespersons = SalePersons.objects.annotate(
                 active_clinics_count=Count("clinics", distinct=True),
-                total_revenue=Sum(
+                total_revenue=Coalesce(Sum(
                         "clinics__user_profiles__user__payments__amount",
                         filter=Q(clinics__user_profiles__user__payments__payment_status="Paid")
-                    ),
+                    ),Value(0.0, output_field=FloatField())),
                 total_users=Count("clinics__user_profiles", distinct=True),
                 commission_amount=Coalesce(
-                            Sum(
-                                F('sales__subscription_count') * Value(50.0, output_field=FloatField()) *
-                                (F('sales__commission_percent') / 100.0),
+                                    Sum(
+                                        F('sales__subscription_count') * Value(50.0, output_field=FloatField()) *
+                                        (F('sales__commission_percent') / 100.0),
+                                        distinct=True,
+                                        output_field=FloatField()
+                                    ),
+                                    Value(0.0, output_field=FloatField())
+                )
+                ).annotate(
+                    sales_per_clinic=Case(
+                        When(
+                            active_clinics_count__gt=0,
+                            then=ExpressionWrapper(
+                                F("total_users") / F("active_clinics_count"),
                                 output_field=FloatField()
-                            ),
-                            Value(0.0, output_field=FloatField())
-                        )
-            ).annotate(
-                sales_per_clinic=Case(
-                    When(
-                        active_clinics_count__gt=0,
-                        then=ExpressionWrapper(
-                            F("total_users") / F("active_clinics_count"),
-                            output_field=FloatField()
-                        )
+                            )
+                        ),
+                        default=Value(0),
+                        output_field=FloatField()
                     ),
-                    default=Value(0),
-                    output_field=FloatField()
-                ),
-                name=F("user__username"),
-                SalePersonId=F("sale_person_id"),
-                ActiveClinics=F("active_clinics_count"),
-                SalesPerClinic=F("sales_per_clinic"),
-                RevenueGenerated=F("total_revenue"),
-            ).values(
-                "SalePersonId",
-                "country",
-                "name",
-                "ActiveClinics",
-                "SalesPerClinic",
-                "RevenueGenerated",
-                "total_users",
-                "commission_amount"
-            )
-            result = list(salespersons_)
+                    name=F("user__username"),
+                    SalePersonId=F("sale_person_id"),
+                    ActiveClinics=F("active_clinics_count"),
+                    SalesPerClinic=F("sales_per_clinic"),
+                    RevenueGenerated=F("total_revenue"),
+                ).values(
+                    "SalePersonId",
+                    "country",
+                    "name",
+                    "ActiveClinics",
+                    "SalesPerClinic",
+                    "RevenueGenerated",
+                    "total_users",
+                    "commission_amount"
+                )
+            result = list(salespersons)
             return Response({result:result},status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": f"Error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)   
@@ -119,22 +120,6 @@ class SalesTarget(APIView):
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'} , status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-class GetSalesPersonsIdsNames(APIView):
-    def get(self , request ):
-        try:
-            salespersons = SalePersons.objects.select_related('user').values("sale_person_id", "user__username")
-
-            result = [
-                {
-                    "SalePersonID": sp["sale_person_id"],
-                    "Name": sp["user__username"]
-                }
-                for sp in salespersons
-            ]
-            return Response({"salespersons": result}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"error": f"Error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 #/get_salesperson_details,/get_salesperson_details_by_id
 class SalesPersonsFullDetails(APIView):
     def get(self , request , sale_person_id ):
@@ -224,48 +209,7 @@ class SalesCommision(APIView):
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'}, status=500)
 
-class UpdateSalesPersonProfile(APIView):
-    def put(self, request, sale_person_id):
-        try:
-            # Fetch the salesperson object
-            salesperson = SalePersons.objects.filter(sale_person_id=sale_person_id).first()
-            if not salesperson:
-                return Response({'error': 'SalePerson not found'}, status=status.HTTP_404_NOT_FOUND)
-
-            # Fields to update
-            updatable_fields = ["phone", "state", "country", "status", "subscription_count", "commission_percent"]
-
-            # Loop through provided fields and update them
-            for field in updatable_fields:
-                value = request.data.get(field)
-                if value is not None:  # Update only if field is provided
-                    setattr(salesperson, field, value)
-
-            # Save only if any field is updated
-            salesperson.save()
-
-            return Response({'message': 'Profile updated successfully'}, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-class GetDemoRequests(APIView):
-    def get(self , request):
-        try:
-            saleperson_id = request.GET.get('SlpId', None) 
-            # Fetch the salesperson object
-            if(saleperson_id is None):
-                result = DemoRequested.objects.all().values()
-                return Response({'demo_requests': list(result)}, status=status.HTTP_200_OK)
-            
-            salesperson_demo_requests = DemoRequested.objects.filter(sale_person_id=saleperson_id).first()
-            if not salesperson_demo_requests.exists():
-                return Response({'demo_requests': [], "message": "No demo requests found"}, status=status.HTTP_200_OK)
-            return Response({'demo_requests': list(salesperson_demo_requests.values())}, status=status.HTTP_200_OK) 
-
-        except Exception as e:
-            return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+#/assign_salesperson, need to verify it's best way to implement assigning in same function
 class UpdateDemoRequest(APIView):
     def put(self, request, demo_request_id):
         try:

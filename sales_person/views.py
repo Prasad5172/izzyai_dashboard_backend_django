@@ -14,9 +14,12 @@ from payment.models import Payment
 from sales_director.models import Sales
 from utils.sendregisteration import send_clinic_signup_link_email
 from rest_framework import status
-from .models import SalePersonActivityLog,SalePersonPipeline,SalesTarget
+from .models import SalePersonActivityLog,SalePersonPipeline,SalesTarget,SalePersons
 from clinic.models import DemoRequested
 from utils.MonthsShortHand import MONTH_ABBREVIATIONS
+
+
+
 
 #/insert_pipeline_progress
 class SalespersonPipelineProgress(APIView):
@@ -429,4 +432,46 @@ class GetSalesBySalesPerson(APIView):
             return Response(sales_by_sales_person,status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'} , status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
+#/salespersons_ids
+class GetSalesPersonsIdsNames(APIView):
+    def get(self , request ):
+        try:
+            salespersons = SalePersons.objects.select_related('user').values("sale_person_id", "user__username")
+
+            result = [
+                {
+                    "SalePersonID": sp["sale_person_id"],
+                    "Name": sp["user__username"]
+                }
+                for sp in salespersons
+            ]
+            return Response({"salespersons": result}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": f"Error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+#/update_country,/update_comission_percent
+class UpdateSalesPersonProfile(APIView):
+    def put(self, request, sale_person_id):
+        try:
+            # Fetch the salesperson object
+            salesperson = SalePersons.objects.filter(sale_person_id=sale_person_id).first()
+            if not salesperson:
+                return Response({'error': 'SalePerson not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Fields to update
+            updatable_fields = ["phone", "state", "country", "status", "subscription_count", "commission_percent"]
+
+            # Loop through provided fields and update them
+            for field in updatable_fields:
+                value = request.data.get(field)
+                if value is not None:  # Update only if field is provided
+                    setattr(salesperson, field, value)
+
+            # Save only if any field is updated
+            salesperson.save()
+
+            return Response({'message': 'Profile updated successfully'}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
