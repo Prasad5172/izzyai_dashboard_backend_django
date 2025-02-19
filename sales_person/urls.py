@@ -16,11 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path , include
-from .views import SalespersonSalesApiView,SalepersonClincRegister,SalespersonActivityLog , SalespersonPipelineProgress
+from .views import  SalespersonPipelineProgress,GenerateDemoCredentials,SendClinicRegistredLinkAfterDemo,ActivityLog
 urlpatterns = [
-   path('salesperson-sales/' , SalespersonSalesApiView.as_view() , name="salesperson-sales") , 
-   path('salesperson-clinc-register/' , SalepersonClincRegister.as_view() , name="salesperson-clinc-register"),
-   path('salesperson-activity-log/' , SalespersonActivityLog.as_view() , name="salesperson-activity-log"), 
-   path('salesperson-pipeline-progress' , SalespersonPipelineProgress.as_view() , name="salesperson-pipeline-progress")
+   path('salesperson-pipeline-progress' , SalespersonPipelineProgress.as_view() , name="salesperson-pipeline-progress"),
+   path('generate-demo-credentials/' , GenerateDemoCredentials.as_view() , name="generate-demo-credentials"), #/generate_demo_credentials
+   path('clinic-register-link/' , SendClinicRegistredLinkAfterDemo.as_view() , name="send-registred-link"),#/clinic_register_link
+   path('get_activity_log/' , ActivityLog.as_view() , name="send-registred-link"), #get_activity_log/
+   path('insert-pipeline-progress/' , ActivityLog.as_view() , name="send-registred-link"), #insert_pipeline_progress
+
+   
 
 ]

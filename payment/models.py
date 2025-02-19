@@ -16,12 +16,12 @@ class Payment(models.Model):
     owner_email = models.EmailField(max_length=255)
     payment_method_id = models.CharField(max_length=255 , unique=True)
     invoice_id = models.CharField(max_length=255 , unique=True)
-    subscription_id = models.ForeignKey('payment.Subscriptions', on_delete=models.CASCADE)  # This should be a ForeignKey to Subscription model
+    subscription = models.ForeignKey('payment.Subscriptions', on_delete=models.CASCADE)
     status = models.CharField(max_length=255)
     payment_date = models.DateTimeField(null=True, blank=True)
     amount = models.FloatField(default=0)
     #user_id = models.IntegerField(unique=True)
-    user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE, related_name="user_payment")
+    user = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE, related_name="payments")
     user_payment_id = models.IntegerField(unique=True)
     subscription_start_date = models.DateTimeField(null=True, blank=True)
     subscription_end_date = models.DateTimeField(null=True, blank=True)
@@ -42,9 +42,9 @@ class Invoice(models.Model):
     customer_name = models.CharField(max_length=255)
     customer_email = models.EmailField(max_length=255)
     invoice_status = models.CharField(max_length=50)
-    user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE) #ask jayanth, not present in the pdf
-    subscription_id = models.ForeignKey('payment.Subscriptions', on_delete=models.CASCADE) # This should be a ForeignKey to Subscription model
-    clinic_id = models.ForeignKey('clinic.Clinics', on_delete=models.CASCADE) # This should be a ForeignKey to Clinic model
+    user = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE) #ask jayanth, not present in the pdf
+    subscription = models.ForeignKey('payment.Subscriptions', on_delete=models.CASCADE) # This should be a ForeignKey to Subscription model
+    clinic = models.ForeignKey('clinic.Clinics', on_delete=models.CASCADE) # This should be a ForeignKey to Clinic model
     issue_date = models.DateTimeField(null=True, blank=True)
     amount = models.BigIntegerField(default=0)
 
@@ -59,7 +59,7 @@ class Coupon(models.Model):
     is_used = models.BooleanField(default=False)
     code = models.CharField(max_length=50, unique=True)
     user_type = models.CharField(max_length=255) # This should be a ForeignKey to User model
-    user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE) # This should be a ForeignKey to User model
+    user = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE) # This should be a ForeignKey to User model
     discount = models.IntegerField()
     expiration_date = models.DateField()
     redemption_count = models.IntegerField()

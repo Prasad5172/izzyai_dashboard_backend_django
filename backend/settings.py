@@ -51,7 +51,8 @@ INSTALLED_APPS = [
     'notifications',
     'drf_spectacular',
     'adminer',
-    'patient'
+    'patient',
+    'django_extensions'
 ]
 
 MIDDLEWARE = [

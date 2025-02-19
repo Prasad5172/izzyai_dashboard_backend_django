@@ -9,9 +9,9 @@ class Slps(models.Model):
     email = models.EmailField(unique=True)
     slp_name = models.CharField(max_length=255)
     #user_id = models.BigIntegerField(unique=True)
-    user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
+    user = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
     #clinic_id = models.BigIntegerField(null=True, blank=True)
-    clinic_id = models.ForeignKey('clinic.Clinics', on_delete=models.CASCADE)
+    clinic = models.ForeignKey('clinic.Clinics', on_delete=models.CASCADE)
     phone = models.BigIntegerField(unique=True)
 
     def __str__(self):  
@@ -20,11 +20,11 @@ class Slps(models.Model):
 class SlpAppointments(models.Model):
     #disorder_id = models.BigIntegerField()
     appointment_id = models.BigAutoField(primary_key=True)
-    disorder_id = models.ForeignKey('clinic.Disorders', on_delete=models.CASCADE)
+    disorder = models.ForeignKey('clinic.Disorders', on_delete=models.CASCADE)
     #slp_id = models.BigIntegerField(null=True, blank=True)
-    slp_id = models.ForeignKey('slp.Slps', on_delete=models.CASCADE)
+    slp = models.ForeignKey('slp.Slps', on_delete=models.CASCADE)
     #user_id = models.BigIntegerField(null=True, blank=True)
-    user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
+    user = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
     appointment_date = models.DateTimeField(null=False, blank=False)
     session_type = models.CharField(max_length=255)
     appointment_status = models.CharField(max_length=255)

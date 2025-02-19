@@ -5,11 +5,23 @@ def create_users(n):
     fake: Faker = Faker()
     users = []
     for i in range(n):
+        if i < 10:
+            usertype = "sale_person"
+        elif i < 20:
+            usertype = "sales_director"
+        elif i < 50:
+            usertype = "patient"
+        elif i < 70:
+            usertype = "clinic"
+        elif i < 90:
+            usertype = "slp"
+        else:
+            usertype = "sales"
         user = CustomUser.objects.create(
             username=fake.user_name()+str(i),
             email=fake.email(),
             password=fake.password(),
-            user_type=random.choice(["admin", "slp", "sale_person","clinic","sales_director"]),
+            user_type=usertype,
             verified=fake.boolean(),
         )
         users.append(user)
@@ -65,8 +77,7 @@ def create_user_files(users):
     user_files = []
     for i in range(100):
         user_file = UserFiles.objects.create(
-            file_id=i,
-            role=random.choice(["admin", "slp", "sale_person","clinic","sales_director" , "Patient"]),
+            role=random.choice(["admin", "slp", "sale_person","clinic","sales_director" , "patient"]),
             file_path=fake.file_path(),
             user=users[i],
             file_name=fake.file_name(),
@@ -93,11 +104,11 @@ def create_sessions(users, disorders,session_types):
         date = fake.date_time_this_year()
         session = Sessions.objects.create(
             session_status=random.choice(["Completed", "quick_assessment_status"]),
-            user_id=random.choice(users),
-            session_type_id=random.choice(session_types),
+            user=random.choice(users),
+            session_type=random.choice(session_types),
             start_time=date,
             end_time=date+timedelta(days=1),
-            disorder_id=random.choice(disorders),
+            disorder=random.choice(disorders),
         )
         sessions.append(session)
     return sessions
@@ -111,9 +122,9 @@ def create_user_excerise(n,sessions,disorders,users):
             level_name=fake.name(),
             world_id=random.randint(1, 100),
             sound_id=random.randint(1, 100),
-            session_id=random.choice(sessions),
+            session=random.choice(sessions),
             sound_id_list=fake.text(),
-            disorder_id=random.choice(disorders),
+            disorder=random.choice(disorders),
             user=random.choice(users),
             completion_status=random.choice(["Completed", "Incomplete"]),
             exercise_date=fake.date_time_this_year(),
@@ -133,8 +144,8 @@ def create_sale_persons(users,subscriptions):
             state=fake.state(),
             country=fake.country(),
             status=random.choice(["Active", "Inactive"]),
-            user_id=users[i],
-            subscription_id=random.choice(subscriptions),
+            user=users[i],
+            subscription=random.choice(subscriptions),
             subscription_count=random.randint(1, 10),
             commission_percent=random.randint(1, 10),
         )
@@ -161,7 +172,7 @@ def create_sales_targets(n,sale_persons):
     sales_targets = []
     for i in range(n):
         sales_target = SalesTarget.objects.create(
-            sale_person_id=random.choice(sale_persons),
+            sale_person=random.choice(sale_persons),
             month=random.randint(1, 12),
             year=random.randint(2010, 2020),
             target=random.randint(1000, 9999),
@@ -173,7 +184,7 @@ def create_sale_person_activity_logs(n,sale_persons):
     sale_person_activity_logs = []
     for i in range(n):
         sale_person_activity_log = SalePersonActivityLog.objects.create(
-            sale_person_id=random.choice(sale_persons),
+            sale_person=random.choice(sale_persons),
             meetings=random.randint(1, 10),
             qualifying_calls=random.randint(1, 10),
             renewal_calls=random.randint(1, 10),
@@ -188,7 +199,7 @@ def create_sale_person_pipelines(sale_persons):
     sale_person_pipelines = []
     for i in range(10):
         sale_person_pipeline = SalePersonPipeline.objects.create(
-            sale_person_id=random.choice(sale_persons),
+            sale_person=random.choice(sale_persons),
             qualified_sales=random.randint(1, 10),
             renewals=random.randint(1, 10),
             prospective_sales=random.randint(1, 10),
@@ -203,7 +214,7 @@ def create_sales_directors(users):
     sales_directors = []
     for i in range(10,20):
         sales_director = SalesDirector.objects.create(
-            user_id=users[i],
+            user=users[i],
             department=random.choice(["sales"]),
             designation=random.choice(["Head","director","regional director"]),
         )
@@ -220,7 +231,7 @@ def create_patient_files(users,start,end):
             diagnosis_name = fake.name(),
             role=random.choice(["Patient", "SLP"]),
             file_path=fake.file_path(),
-            user_id=users[i],
+            user=users[i],
             upload_timestamp=fake.date_time_this_year(),
         )
         patient_files.append(patient_file)
@@ -231,10 +242,10 @@ def create_assessment_results(users,sessions,disorders,n):
     assessment_results = []
     for i in range(n):
         assessment_result = AssessmentResults.objects.create(
-            user_id = users[i%30+20],
-            session_id=random.choice(sessions),
+            user = users[i%30+20],
+            session=random.choice(sessions),
             score = random.randint(0, 100),
-            disorder_id=random.choice(disorders),
+            disorder=random.choice(disorders),
             sound_id_list = fake.text(),
             word_id_list = fake.text(),
             emotion = random.choice(["Happy", "Sad", "Angry"]),
@@ -253,9 +264,9 @@ def create_clinics(n,users,sale_persons):
             state=fake.state(),
             total_patients=random.randint(100, 150),
             slp_count = random.randint(1, 10),
-            sale_person_id = random.choice(sale_persons),
+            sale_person = random.choice(sale_persons),
             country=fake.country(),
-            user_id = users[i+50],
+            user = users[i+50],
             email=fake.email(),
             ein_number=random.randint(100000, 999999),
             phone=random.randint(1000000000, 9999999999),
@@ -275,7 +286,7 @@ def create_demo_requests(n,sale_persons):
             country=fake.country(),
             comments=fake.text(),
             contact_number=random.randint(1000000000, 9999999999),
-            sales_person_id=sale_persons[i%10],
+            sales_person=sale_persons[i%10],
             email=fake.email(),
             patients_count  = random.randint(1, 100),
         )
@@ -293,8 +304,8 @@ def create_slps(n,users,clinics):
             state=fake.state(),
             email=fake.email(),
             slp_name=fake.name(),
-            user_id=users[80+i],
-            clinic_id=clinics[i%10],
+            user=users[80+i],
+            clinic=clinics[i%10],
             phone=random.randint(1000000000, 9999999999),
         )
         slps.append(slp)
@@ -305,9 +316,9 @@ def create_slp_appoinments(n,users,slps,disorders):
     slp_appoinments = []
     for i in range(n):
         slp_appointment = SlpAppointments.objects.create(
-            disorder_id = random.choice(disorders),
-            slp_id=random.choice(slps),
-            user_id=users[20+i],
+            disorder = random.choice(disorders),
+            slp=random.choice(slps),
+            user=users[20+i],
             appointment_date=fake.date_this_year(),
             session_type=random.choice(["Assessment", "Exercise","Language Therapy"]),
             appointment_status = random.choice(["Attended", "Canceled","Pending"]),
@@ -317,14 +328,15 @@ def create_slp_appoinments(n,users,slps,disorders):
         slp_appoinments.append(slp_appointment)
     return slp_appoinments
 
-def create_sales(n,clinics,sales_persons):
+def create_sales(n,clinics):
     sales = []
     for i in range(n):
+        clinic = clinics[i%20]
         sale = Sales.objects.create(
-            sale_person_id=random.choice(sales_persons),
+            sale_person=clinic.sale_person,
             subscription_count=random.randint(1, 10),
             commission_percent=random.randint(1, 50),
-            clinic_id=clinics[i%20],
+            clinic=clinic,
             payment_status=random.choice(["Paid", "Unpaid"]),
             subscription_type=random.choice(["Monthly", "Yearly"]),
         )
@@ -339,15 +351,15 @@ def create_clinic_appointments(n,users,clinics,slps,disorders):
         clinic = clinics[i%10]
         slp = slps[i%10]
         clinic_appointment = ClinicAppointments.objects.create(
-            clinic_id=clinic,
-            slp_id = slp,#this should be clinic slps
+            clinic=clinic,
+            slp = slp,#this should be clinic slps
             session_type=random.choice(["Assessment", "Exercise","Language Therapy"]),
             appointment_status = random.choice(["Attended", "Canceled","Pending"]),
             appointment_date = date,
             appointment_start = date,
             appointment_end = date + timedelta(days=1),
-            disorder_id = random.choice(disorders),
-            user_id = users[i%30+20],
+            disorder = random.choice(disorders),
+            user = users[i%30+20],
         )
         clinic_appointments.append(clinic_appointment)
     return clinic_appointments
@@ -358,12 +370,12 @@ def create_clinic_user_reminders(n,clinic_appoinments):
     for i in range(n):
         clinic_appoinment = random.choice(clinic_appoinments)
         clinic_user_reminder = ClinicUserReminders.objects.create(
-            clinic_id=clinic_appoinment.clinic_id,
+            clinic=clinic_appoinment.clinic,
             reminder_to = fake.name(),
             date = fake.date_this_year(),
             is_sent = fake.boolean(),
             time = fake.date_time_this_year(),
-            reminder_appointment_id = clinic_appoinment,
+            reminder_appointment = clinic_appoinment,
             reminder_description = fake.text(),
         )
         clinic_user_reminders.append(clinic_user_reminder)
@@ -376,11 +388,11 @@ def create_tasks(n,clinics,slps):
         clinic = clinics[i%10]
         slp = slps[i%10]
         task = Tasks.objects.create(
-            clinic_id=clinic,
+            clinic=clinic,
             status=random.choice(["Pending", "Completed","Declined"]),
             task_name=fake.name(),
             description=fake.text(),
-            slp_id=slp,
+            slp=slp,
         )
         tasks.append(task)
     return tasks
@@ -390,7 +402,7 @@ def create_therapy_data(n,users,slps):
     therapy_datas = []
     for i in range(n):
         therapy_data = TherapyData.objects.create(
-            user_id=random.choice(users),
+            user=random.choice(users),
             objective = fake.sentence(),
             patient_name = fake.name(),
             slp_name = fake.name(),
@@ -399,7 +411,7 @@ def create_therapy_data(n,users,slps):
             condition = fake.text(),
             criterion = fake.text(),
             performance = fake.text(),
-            slp_id=random.choice(slps),
+            slp=random.choice(slps),
         )
         therapy_datas.append(therapy_data)
     return therapy_datas
@@ -409,14 +421,14 @@ def create_treatment_data(n,users,slps):
     treatment_datas = []
     for i in range(n):
         treatment_data = TreatmentData.objects.create(
-            user_id=random.choice(users),
+            user=random.choice(users),
             interventions = fake.text(),
             diagnosis_name = fake.name(),
             therapist_name = fake.name(),
             patient_age = random.randint(6, 80),
             goal = fake.text(),
             patient_name = fake.name(),
-            slp_id=random.choice(slps),
+            slp=random.choice(slps),
             date = fake.date_time_this_year(),
         )
         treatment_datas.append(treatment_data)
@@ -427,7 +439,7 @@ def create_notification(n,users):
     notifications = []
     for i in range(n):
         notification = Notification.objects.create(
-            user_id=random.choice(users),
+            user=random.choice(users),
             is_read = fake.boolean(),
             time = fake.date_time_this_year(),
             message = fake.text(),
@@ -449,11 +461,11 @@ def create_payments(n,users,subscriptions):
             owner_email = fake.email(),
             payment_method_id = fake.credit_card_number(),
             invoice_id = random.randint(1, 9999999999),
-            subscription_id = subscription,
+            subscription = subscription,
             status = random.choice(["Active", "Expired","Cancelled"]),
             payment_date = fake.date_this_year(),
             amount = subscription.subscription_price,
-            user_id=random.choice(users),
+            user=random.choice(users),
             user_payment_id = random.randint(1,10000000000000),
             payment_status = random.choice(["Paid", "Unpaid"]),
             subscription_start_date = fake.date_this_year(),
@@ -477,9 +489,9 @@ def create_invoices(n,payments,clinics):
             customer_name = fake.name(),
             customer_email = fake.email(),
             invoice_status = random.choice(["Paid", "Unpaid"]),
-            user_id = payment.user_id,
-            subscription_id = payment.subscription_id,
-            clinic_id = random.choice(clinics),
+            user = payment.user,
+            subscription = payment.subscription,
+            clinic= random.choice(clinics),
             issue_date = fake.date_this_year(),
             amount = payment.amount,
         )
@@ -495,7 +507,7 @@ def create_coupons(n,users):
             is_used = fake.boolean(),
             code = fake.text(),
             user_type = "patient",
-            user_id = users[i%20+21],
+            user = users[i%20+21],
             discount = 100,
             expiration_date = fake.date_this_year(),
             redemption_count = 1,
@@ -547,7 +559,7 @@ if __name__ == "__main__":
     slps = create_slps(10,users,clinics)
     slp_appointments = create_slp_appoinments(30,users,slps,disorders)
     # 91-100 sales
-    sales = create_sales(30,clinics,sale_persons)
+    sales = create_sales(30,clinics)
     clinic_appoinments = create_clinic_appointments(200,users,clinics,slps,disorders)
     clinic_user_reminders = create_clinic_user_reminders(100,clinic_appoinments)
     tasks = create_tasks(100,clinics,slps)

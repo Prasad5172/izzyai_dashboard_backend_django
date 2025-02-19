@@ -88,6 +88,13 @@ class ClinicPatients(APIView):
                 )
     
         return JsonResponse(list(users), safe=False)
-        
 
+#/get_clinics
+class GetClinicsWithIdName(APIView):
+    def get(self,request):
+        try:
+            clinics = Clinics.objects.values("clinic_id", "clinic_name").order_by("clinic_name")
+            return Response(clinics,status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'Error occurred: {str(e)}'} , status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

@@ -11,6 +11,7 @@ from django.utils.crypto import get_random_string
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
+from django.utils.timezone import now
 from datetime import timedelta
 from django.contrib.auth import authenticate
 from authentication.models import CustomUser
@@ -94,6 +95,10 @@ def refresh_tokens(refresh_token):
     except CustomUser.DoesNotExist:
         # If the user is not found in the database, raise an appropriate error
         raise InvalidToken("User not found for the provided token.")
+
+"""
+Note:All the required field are validate in the frontend to faster response from server,we are not implemented in the code(it saves time)
+"""
 
 # this is for signup for admin and sales_director
 class AdminAndSaleDirectorSignupAPIView(APIView):
@@ -432,11 +437,17 @@ class LoginAPIView(APIView):
         password = request.data.get('password')
         print(password)
 
+
         user = authenticate(email=email, password=password) #debug showing error if user and password is present in db 
-        
         if user is None:
             return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
-
+        
+        if user and not user.verified: #for demo user verified flag is set to true while creating demo credentails
+            return Response({"error": "Email not verified"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        if(user.user_type == "DemoUser" and user.expiration_date < now()):
+            return Response({"error": "Demo User is expired"}, status=status.HTTP_400_BAD_REQUEST)
+        
         access_token = get_tokens_for_user(user)
 
         return Response({

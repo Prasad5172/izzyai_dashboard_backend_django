@@ -6,8 +6,8 @@ class SalePersons(models.Model):
     state = models.CharField(max_length=255)
     country = models.CharField(max_length=255)
     status = models.CharField(max_length=255)#redundant
-    user_id = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
-    subscription_id = models.ForeignKey('payment.Subscriptions', on_delete=models.CASCADE)
+    user = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
+    subscription = models.ForeignKey('payment.Subscriptions', on_delete=models.CASCADE)
     subscription_count = models.BigIntegerField(default=0)
     commission_percent = models.BigIntegerField(default=0)
 
@@ -16,7 +16,7 @@ class SalePersons(models.Model):
 
 class SalesTarget(models.Model):
     sales_target_id = models.BigAutoField(primary_key=True)
-    sale_person_id = models.ForeignKey('SalePersons', on_delete=models.CASCADE)
+    sale_person = models.ForeignKey('SalePersons', on_delete=models.CASCADE)
     month = models.IntegerField(null=True, blank=True)
     year = models.IntegerField(null=True, blank=True)
     target = models.BigIntegerField(default=0)
@@ -25,7 +25,7 @@ class SalesTarget(models.Model):
         return f"Target for SalePerson {self.sale_person_id} ({self.month}/{self.year})"
 class SalePersonActivityLog(models.Model):
     sale_person_activity_log_id = models.BigAutoField(primary_key=True)
-    sale_person_id = models.ForeignKey('SalePersons', on_delete=models.CASCADE)
+    sale_person = models.ForeignKey('SalePersons', on_delete=models.CASCADE)
     meetings = models.BigIntegerField(default=0)
     qualifying_calls = models.BigIntegerField(default=0)
     renewal_calls = models.BigIntegerField(default=0)
@@ -37,7 +37,7 @@ class SalePersonActivityLog(models.Model):
 
 class SalePersonPipeline(models.Model):
     sale_person_pipeline_id = models.BigAutoField(primary_key=True)
-    sale_person_id = models.ForeignKey(SalePersons, on_delete=models.CASCADE)
+    sale_person = models.ForeignKey(SalePersons, on_delete=models.CASCADE)
     qualified_sales = models.BigIntegerField()
     renewals = models.BigIntegerField()
     prospective_sales = models.BigIntegerField()

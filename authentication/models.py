@@ -29,15 +29,16 @@ class CustomUser(AbstractUser):
     is_google_user = models.BooleanField(default=False)
     last_login = models.DateTimeField(null=True, blank=True)
     otp = models.IntegerField(null=True, blank=True)
-    is_otp_verified = models.BooleanField(default=False)  # remove
+    is_otp_verified = models.BooleanField(default=False)  # remove(redundant)
     verified = models.BooleanField(default=False)
     source = models.CharField(max_length=255, null=True, blank=True)
-    otp_for_signup = models.CharField(max_length=255, null=True, blank=True)     #  remove
+    otp_for_signup = models.CharField(max_length=255, null=True, blank=True)  #remove(redundant)
     is_setup_profile = models.BooleanField(default=False)
     otp_created_at = models.DateTimeField(null=True, blank=True)
     user_type = models.CharField(max_length=255)
     created_account = models.DateTimeField(auto_now_add=True)
     username = models.CharField(unique=True,max_length=255)
+    expiration_date = models.DateTimeField(null=True, blank=True) # this is for demo request users
     groups = models.ManyToManyField(
         "auth.Group",
         related_name="customuser_groups",
@@ -56,8 +57,8 @@ class CustomUser(AbstractUser):
 # User Profile Model
 class UserProfile(models.Model):
     profile_id = models.BigAutoField(primary_key=True)
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
-    clinic_id = models.ForeignKey('clinic.Clinics', on_delete=models.SET_NULL, null=True, blank=True, related_name="user_profiles")
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="profile")
+    clinic = models.ForeignKey('clinic.Clinics', on_delete=models.SET_NULL, null=True, blank=True, related_name="user_profiles")
     full_name = models.CharField(max_length=255)
     gender = models.CharField(max_length=50)
     checkbox_values = models.TextField(null=True, blank=True)
@@ -66,7 +67,7 @@ class UserProfile(models.Model):
     patient_status = models.CharField(max_length=255)
     state = models.CharField(max_length=255)
     status = models.CharField(max_length=255)
-    slp_id = models.ForeignKey('slp.Slps', on_delete=models.SET_NULL,null=True, blank=True)
+    slp = models.ForeignKey('slp.Slps', on_delete=models.SET_NULL,null=True, blank=True)
     avatar_id = models.IntegerField(null=True, blank=True)
     face_authentication_state = models.BooleanField(default=False)
     contact_number = models.BigIntegerField(null=True, blank=True)
@@ -98,9 +99,9 @@ class UserExercises(models.Model):
     level_name = models.CharField(max_length=255)
     world_id = models.IntegerField(null=True, blank=True)
     sound_id = models.IntegerField(null=True, blank=True)
-    session_id = models.ForeignKey('clinic.Sessions', on_delete=models.CASCADE,null=True, blank=True)
+    session = models.ForeignKey('clinic.Sessions', on_delete=models.CASCADE,null=True, blank=True)
     sound_id_list = models.CharField(max_length=255)
-    disorder_id = models.ForeignKey('clinic.Disorders', on_delete=models.CASCADE,null=True, blank=True)
+    disorder = models.ForeignKey('clinic.Disorders', on_delete=models.CASCADE,null=True, blank=True)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     completion_status = models.CharField(max_length=255)
     exercise_date = models.DateTimeField(null=True,blank=True)

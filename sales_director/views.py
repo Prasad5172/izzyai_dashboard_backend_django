@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.db.models import Count, Sum, F, Q,FloatField,Value
+from django.db.models import Count, Sum, F, Q,FloatField,Value,Case,When,ExpressionWrapper
 from django.db.models.functions import Coalesce, Round
 from datetime import timedelta
 from django.utils.timezone import now
@@ -17,48 +17,62 @@ def activeClinicsForSalesPerson(sale_person_id):
 
 # Create your views here.
 #/get_all_salespersons_overview
+#query verified
 class SalesPersonDetails(APIView):
     def get_all_salespersons_overview(request):
         """
         Fetches an overview of all salespersons, including clinic count, user count, sales per clinic, and revenue.
         """
         try:
-            salespersons = SalePersons.objects.all().values("id", "name", "country")
-            result = []
-            for sp in salespersons:
-                sale_person_id = sp["id"]
-                name = sp["name"]
-                country = sp["country"]
-                # Count active clinics for the salesperson
-                active_clinics = activeClinicsForSalesPerson(sale_person_id)
-                active_clinics_count = active_clinics.count()
-                # Count total users under the salesperson's clinics
-                users = UserProfile.objects.filter(
-                    clinic_id__in=active_clinics
-                ).values("user_id")
-                total_users = users.count()
-
-                # Calculate Sales Per Clinic (rounding up)
-                sales_per_clinic = total_users // active_clinics_count if active_clinics > 0 else 0
-
-                # Calculate total revenue generated
-                revenue_generated = Payment.objects.filter(
-                    user_id__in=users
-                ).aggregate(total_revenue=Sum("amount"))["total_revenue"] or 0
-
-                result.append({
-                    "SalePersonID": sale_person_id,
-                    "Name": name,
-                    "Country": country,
-                    "ActiveClinics": active_clinics_count,
-                    "SalesPerClinic": sales_per_clinic,
-                    "RevenueGenerated": revenue_generated
-                })
+            salespersons_ = SalePersons.objects.annotate(
+                active_clinics_count=Count("clinics", distinct=True),
+                total_revenue=Sum(
+                        "clinics__user_profiles__user__payments__amount",
+                        filter=Q(clinics__user_profiles__user__payments__payment_status="Paid")
+                    ),
+                total_users=Count("clinics__user_profiles", distinct=True),
+                commission_amount=Coalesce(
+                            Sum(
+                                F('sales__subscription_count') * Value(50.0, output_field=FloatField()) *
+                                (F('sales__commission_percent') / 100.0),
+                                output_field=FloatField()
+                            ),
+                            Value(0.0, output_field=FloatField())
+                        )
+            ).annotate(
+                sales_per_clinic=Case(
+                    When(
+                        active_clinics_count__gt=0,
+                        then=ExpressionWrapper(
+                            F("total_users") / F("active_clinics_count"),
+                            output_field=FloatField()
+                        )
+                    ),
+                    default=Value(0),
+                    output_field=FloatField()
+                ),
+                name=F("user__username"),
+                SalePersonId=F("sale_person_id"),
+                ActiveClinics=F("active_clinics_count"),
+                SalesPerClinic=F("sales_per_clinic"),
+                RevenueGenerated=F("total_revenue"),
+            ).values(
+                "SalePersonId",
+                "country",
+                "name",
+                "ActiveClinics",
+                "SalesPerClinic",
+                "RevenueGenerated",
+                "total_users",
+                "commission_amount"
+            )
+            result = list(salespersons_)
             return Response({result:result},status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": f"Error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)   
 
-class InsertSalesTarget(APIView):
+#/get_sales_target,/insert_sales_target
+class SalesTarget(APIView):
     def post(request):
         """
         Endpoint to insert a sales target for a salesperson.
@@ -91,16 +105,29 @@ class InsertSalesTarget(APIView):
             return Response({'message': 'Sales target inserted successfully'}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        
+    def get(self,request):
+        try:
+            sale_person_id = request.GET.get('SalePersonID')
+            sales_target = SalesTarget.objects.filter(sale_person_id=sale_person_id).first()
+            return Response({
+                'SalePersonID': sale_person_id,
+                'Month': sales_target.month,
+                'Year': sales_target.year,
+                'Target': sales_target.target
+            },status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': f'Error occurred: {str(e)}'} , status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
 class GetSalesPersonsIdsNames(APIView):
     def get(self , request ):
         try:
-            salespersons = SalePersons.objects.select_related('user_id').values("sale_person_id", "user_id__username")
+            salespersons = SalePersons.objects.select_related('user').values("sale_person_id", "user__username")
 
             result = [
                 {
                     "SalePersonID": sp["sale_person_id"],
-                    "Name": sp["user_id__username"]
+                    "Name": sp["user__username"]
                 }
                 for sp in salespersons
             ]
@@ -108,59 +135,52 @@ class GetSalesPersonsIdsNames(APIView):
         except Exception as e:
             return Response({"error": f"Error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class GetSalesPersonDetails(APIView):
+#/get_salesperson_details,/get_salesperson_details_by_id
+class SalesPersonsFullDetails(APIView):
     def get(self , request , sale_person_id ):
         try:
             # Fetch SalesPerson details including subscription count
-            salesperson = SalePersons.objects.select_related('user_id').filter(sale_person_id=sale_person_id).values("user_id__username","country","state","subscription_count","commission_percent","user_id__email","phone","user_id")
-            
+            salesperson = SalePersons.objects.filter(sale_person_id=sale_person_id).annotate(
+                active_clinics=Count("clinics"),
+                total_revenue=Sum("clinics__user_profiles__user__payments__amount", 
+                                filter=Q(clinics__user_profiles__user__payments__payment_status="Paid")),
+                total_users=Count("clinics__user_profiles__user", distinct=True)  # Count unique users across clinics
+                ).values(
+                    "user__username", "country", "state", "subscription_count",
+                    "commission_percent", "user__email", "phone", "user_id",
+                    "active_clinics", "total_revenue", "total_users"
+                ).first()
+
             if not salesperson:
-                return Response({'message': 'SalePerson not found'}, status=404)
+                print({"error": "Salesperson not found"})
+            else:
+                clinics = Clinics.objects.filter(sale_person_id=sale_person_id).values_list("clinic_name", flat=True)
+                active_clinic_names = list(clinics)
 
-            user = salesperson.user_id  # Get associated user details
+                # Avoid division by zero
+                sales_per_clinic = -(-salesperson["total_users"] // salesperson["active_clinics"]) if salesperson["active_clinics"] > 0 else 0
 
-            # Fetch clinic details associated with the salesperson
-            clinics = Clinics.objects.filter(sale_person_id=salesperson).values('clinic_id', 'clinic_name')
-            active_clinics = clinics.count()
-            active_clinic_names = list(clinics.values_list('clinic_name', flat=True))
-            clinic_ids = list(clinics.values_list('clinic_id', flat=True))
-
-            # Find the UserIDs associated with these clinics
-            user_ids = list(UserProfile.objects.filter(clinic_id__in=clinic_ids).values_list('user_id', flat=True))
-
-            # Calculate Revenue Generated only for 'Completed' payments
-            revenue_generated = Payment.objects.filter(
-                user_id__in=user_ids,
-                payment_status='Completed'
-            ).aggregate(total_revenue=Sum('amount'))['total_revenue'] or 0
-
-            # Calculate total users across all clinics for the SalePersonID
-            total_users = len(user_ids)
-
-            # Calculate SalesPerClinic as a whole number (rounding up if necessary)
-            sales_per_clinic = -(-total_users // active_clinics) if active_clinics > 0 else 0
-
-            # Prepare the result
-            result = {
-                'SalePersonID': salesperson.sale_person_id,
-                'Name': user.username,
-                'Email': user.email,
-                'Country': salesperson.country,
-                'State': salesperson.state,
-                'Phone': salesperson.phone,
-                'CommissionPercent': salesperson.commission_percent,
-                'SubscriptionCount': salesperson.subscription_count,
-                'ActiveClinics': active_clinics,
-                'ActiveClinicNames': active_clinic_names,
-                'SalesPerClinic': sales_per_clinic,
-                'RevenueGenerated': revenue_generated
-            }
+                # Prepare the result
+                result = {
+                    'SalePersonID': sale_person_id,
+                    'Name': salesperson['user__username'],
+                    'Email': salesperson['user__email'],
+                    'Country': salesperson['country'],
+                    'State': salesperson['state'],
+                    'Phone': salesperson['phone'],
+                    'CommissionPercent': salesperson['commission_percent'],
+                    'SubscriptionCount': salesperson['subscription_count'],
+                    'ActiveClinics': salesperson['active_clinics'],
+                    'ActiveClinicNames': active_clinic_names,
+                    'SalesPerClinic': sales_per_clinic,
+                    'RevenueGenerated': salesperson['total_revenue'] or 0
+                }
             return Response(result, status=200)
-
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'}, status=500)
 
-class GetSalesCommision(APIView):
+#/get_sales_commission,
+class SalesCommision(APIView):
     def get(self , request , sale_person_id ):
         try:
             time_filter = request.GET.get('time_filter', None)
@@ -276,6 +296,7 @@ class UpdateDemoRequest(APIView):
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+#pass saleperson_id for salesperson revenue else it fetches all persons revenue.
 class GetSalesPersonsRevenue(APIView):
     def get(self , request ):
         try:
