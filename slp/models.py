@@ -11,9 +11,8 @@ class Slps(models.Model):
     #user_id = models.BigIntegerField(unique=True)
     user = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
     #clinic_id = models.BigIntegerField(null=True, blank=True)
-    clinic = models.ForeignKey('clinic.Clinics', on_delete=models.CASCADE)
+    clinic = models.ForeignKey('clinic.Clinics', on_delete=models.CASCADE,related_name="slps")
     phone = models.BigIntegerField(unique=True)
-
     def __str__(self):  
         return self.slp_name
 
@@ -22,7 +21,7 @@ class SlpAppointments(models.Model):
     appointment_id = models.BigAutoField(primary_key=True)
     disorder = models.ForeignKey('clinic.Disorders', on_delete=models.CASCADE)
     #slp_id = models.BigIntegerField(null=True, blank=True)
-    slp = models.ForeignKey('slp.Slps', on_delete=models.CASCADE)
+    slp = models.ForeignKey('slp.Slps', on_delete=models.CASCADE,related_name="slp_appointments")
     #user_id = models.BigIntegerField(null=True, blank=True)
     user = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE)
     appointment_date = models.DateTimeField(null=False, blank=False)

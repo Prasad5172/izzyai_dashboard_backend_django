@@ -45,16 +45,16 @@ class ClinicAppointments(models.Model):
     clinic = models.ForeignKey(Clinics, on_delete=models.CASCADE,related_name="appointments")
     session_type = models.CharField(max_length=255)
     appointment_status = models.CharField(max_length=255)
-    appointment_date = models.DateTimeField(null=False, blank=False)
-    appointment_start = models.DateTimeField(null=False, blank=False)
-    appointment_end = models.DateTimeField(null=False, blank=False)
+    appointment_date = models.DateField(null=False, blank=False)
+    appointment_start = models.TimeField(null=False, blank=False)
+    appointment_end = models.TimeField(null=False, blank=False)
     #disorder_id =  models.BigIntegerField(null=True, blank=True)
     disorder = models.ForeignKey(Disorders, on_delete=models.CASCADE,related_name="appointments")
     #UserID = models.BigIntegerField(null=True, blank=True)
     user = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE,related_name="appointments")
 
     def __str__(self):
-        return self.appointment_id
+        return f"{self.appointment_id}"
 
 class ClinicUserReminders(models.Model):
     reminder_id= models.BigAutoField(primary_key=True)
@@ -99,7 +99,6 @@ class Sessions(models.Model):
 
     def __str__(self):
         return f"Session{self.session_id} - {self.disorder} "
-
 
 
 

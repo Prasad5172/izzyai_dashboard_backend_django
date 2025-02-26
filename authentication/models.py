@@ -57,7 +57,7 @@ class CustomUser(AbstractUser):
 # User Profile Model
 class UserProfile(models.Model):
     profile_id = models.BigAutoField(primary_key=True)
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="profile")
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="user_profiles")
     clinic = models.ForeignKey('clinic.Clinics', on_delete=models.SET_NULL, null=True, blank=True, related_name="user_profiles")
     full_name = models.CharField(max_length=255)
     gender = models.CharField(max_length=50)
@@ -66,8 +66,8 @@ class UserProfile(models.Model):
     country = models.CharField(max_length=255)
     patient_status = models.CharField(max_length=255)
     state = models.CharField(max_length=255)
-    status = models.CharField(max_length=255)
-    slp = models.ForeignKey('slp.Slps', on_delete=models.SET_NULL,null=True, blank=True)
+    status = models.CharField(max_length=255) #this is redundant for patient_status
+    slp = models.ForeignKey('slp.Slps', on_delete=models.SET_NULL,null=True, blank=True, related_name="user_profiles")
     avatar_id = models.IntegerField(null=True, blank=True)
     face_authentication_state = models.BooleanField(default=False)
     contact_number = models.BigIntegerField(null=True, blank=True)
@@ -106,7 +106,7 @@ class UserExercises(models.Model):
     completion_status = models.CharField(max_length=255)
     exercise_date = models.DateTimeField(null=True,blank=True)
     score = models.FloatField(default=0)
-    emotion = models.CharField(max_length=255)
+    emotion = models.CharField(max_length=15000)
     completed_questions = models.IntegerField(default=0)
     sentence_id = models.IntegerField(null=True, blank=True)
     game_name = models.CharField(max_length=255)

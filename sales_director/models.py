@@ -20,4 +20,3 @@ class SalesDirector(models.Model):
 
     def __str__(self):
         return f"Sales Director {self.sales_director_id} - {self.department}"
-3,13,9

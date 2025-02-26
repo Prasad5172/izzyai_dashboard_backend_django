@@ -165,52 +165,50 @@ class SalesPersonsFullDetails(APIView):
             return Response({'error': f'Error occurred: {str(e)}'}, status=500)
 
 #/get_sales_commission,
+#in middle
 class SalesCommision(APIView):
     def get(self , request , sale_person_id ):
         try:
             time_filter = request.GET.get('time_filter', None)
 
-            date_filter = {}
+            date_filter =None
             if time_filter == 'last_month':
-                date_filter['payment_date__gte'] = now() - timedelta(days=30)
+                date_filter = now() - timedelta(days=30)
             elif time_filter == 'annual':
-                date_filter['payment_date__gte'] = now() - timedelta(days=365)
-            
+                date_filter = now() - timedelta(days=365)
+    
             # Fetch sales commission details
-            sales_commission_details = (
-                    SalePersons.objects
-                    .annotate(
-                        revenue_generated=Coalesce(
-                            Sum(
-                                'clinics__user_profiles__user_payment__amount',
-                                filter={**date_filter, 'clinics__user_profiles__user_payment__payment_status': 'Completed'}
+            sales_commission_details = SalePersons.objects.annotate(
+                    revenue_generated=Coalesce(
+                        Sum('clinics__user_profiles__user__payments__amount',
+                            filter=Q(clinics__user_profiles__user__payments__payment_date__gte=date_filter) & Q(clinics__user_profiles__user__payments__payment_status='Paid')
                             ),
-                            Value(0)
-                        ),
-                        commission_per_salesperson=Round(
-                            F('revenue_generated') * (F('commission_percent') / 100.0),
-                            2
-                        )
+                        Value(0.0,output_field=FloatField())
+                    ),
+                    commission_per_salesperson=Round(
+                        F('revenue_generated') * (F('commission_percent') / 100.0),
+                        2
                     )
-                    .values('sale_person_id', 'user_id__name', 'revenue_generated', 'commission_per_salesperson')
-                )
+                ).values('sale_person_id', 'user__username', 'revenue_generated', 'commission_per_salesperson')
              # Convert to JSON response
              
             results = []
             for row in sales_commission_details:
                 results.append({
-                    'SalePersonID': row[0],
-                    'Name': row[1],
-                    'RevenueGenerated': row[2],
-                    'CommissionPerSalePerson': row[3]
+                    'SalePersonID': row["sale_person_id"],
+                    'Name': row["user__username"],
+                    'RevenueGenerated': row["revenue_generated"],
+                    'CommissionPerSalePerson': row["commission_per_salesperson"]
                 })
             return Response(list(results), safe=False)
 
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'}, status=500)
 
-#/assign_salesperson, need to verify it's best way to implement assigning in same function
-class UpdateDemoRequest(APIView):
+
+#pass saleperson_id for salesperson revenue else it fetches all persons revenue.
+
+class AssignSalesPersonToDemoRequest(APIView):
     def put(self, request, demo_request_id):
         try:
             # Fetch the demo request object
@@ -219,7 +217,7 @@ class UpdateDemoRequest(APIView):
                 return Response({'error': 'Demo Request not found'}, status=status.HTTP_404_NOT_FOUND)
 
             # Fields to update
-            updatable_fields = ["clinic_name","first_name","last_name","country","comments","contact_number","email","patients_count","sales_person_id"]
+            updatable_fields = ["sale_person_id"]
 
             # Track if any updates were made
             updated = False
@@ -240,47 +238,65 @@ class UpdateDemoRequest(APIView):
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-#pass saleperson_id for salesperson revenue else it fetches all persons revenue.
+#/get_sales_revenue,/get_sales_revenue_by_id/<int:sale_person_id>
 class GetSalesPersonsRevenue(APIView):
     def get(self , request ):
         try:
-            saleperson_id = request.GET.get('sales_person_id', None) 
+            saleperson_id = int(request.GET.get('sales_person_id', None))
+            time_filter = request.GET.get('time_filter', None) 
+            date_filter = now()-timedelta(days=365)
+            if time_filter == 'last_month':
+                date_filter = now() - timedelta(days=30)
+            elif time_filter == 'annual':
+                date_filter = now() - timedelta(days=365)
+
             if(saleperson_id is not None):
                 #fetch sales persons revenue
-                salesperson =  SalePersons.objects.filter(sale_person_id=saleperson_id).first()
-                if not salesperson:
-                    return Response({"message": "Sales Person Not found"}, status=status.HTTP_404_NOT_FOUND)
-                clinics = Clinics.objects.filter(sale_person_id=salesperson)
-                users = UserProfile.objects.filter(clinic_id__in=clinics)
-                result = Payment.objects.filter(user_id__in=users,payment_status='Completed').values("amount").aggregate(total_revenue=Sum("amount"))
+                salesperson = SalePersons.objects.filter(sale_person_id=saleperson_id).annotate(
+                        total_revenue=Coalesce(Sum("clinics__user_profiles__user__payments__amount",
+                                        filter=Q(clinics__user_profiles__user__payments__payment_date__gte=date_filter) & Q(clinics__user_profiles__user__payments__payment_status="Paid")),
+                                        Value(0.0, output_field=FloatField())),
+                        ).values(
+                            "sale_person_id", "country", "state", "total_revenue"
+                        ).first()
                 return Response(
                     {
-                        'SalePersonID': saleperson_id,
+                        'SalePersonID': salesperson.sale_person_id,
                         'Country': salesperson.country,
                         'State': salesperson.state,
-                        'RevenueGenerated': result['total_revenue']
+                        'RevenueGenerated': salesperson.total_revenue
                         }, status=status.HTTP_200_OK)
-            
-            time_filter = request.GET.get('time_filter', None) 
-
-            date_filter = {}
-            if time_filter == 'last_month':
-                date_filter['payment_date__gte'] = now() - timedelta(days=30)
-            elif time_filter == 'annual':
-                date_filter['payment_date__gte'] = now() - timedelta(days=365)
-
-            salespersons = SalePersons.objects.all()
-            result = []
-            for salesperson in salespersons:
-                clinics = Clinics.objects.filter(sale_person_id=salesperson)
-                users = UserProfile.objects.filter(clinic_id__in=clinics)   
-                revenue = Payment.objects.filter(user_id__in=users,payment_status='Completed',**date_filter).values("amount").aggregate(total_revenue=Sum("amount"))
-                result.append({
-                    "SalePersonID": salesperson.sale_person_id,
-                    "Country": salesperson.country,
-                    "State": salesperson.state,
-                    "RevenueGenerated": revenue['total_revenue']
-                })
-            return Response({"salespersonrevenue": result}, status=status.HTTP_200_OK)
+            salesperson = SalePersons.objects.annotate(
+                total_revenue=Coalesce(Sum("clinics__user_profiles__user__payments__amount",
+                                filter=Q(clinics__user_profiles__user__payments__payment_status="Paid")),
+                                Value(0.0, output_field=FloatField())),
+                ).values(
+                    "sale_person_id", "country", "state", "total_revenue"
+                )
+            return Response({"salespersonrevenue": salesperson}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": f"Error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class AssignSalesPersonToDemoRequest(APIView):
+    def put(self, request, demo_request_id):
+        try:
+            # Fetch the demo request object
+            demo_request = DemoRequested.objects.filter(demo_request_id=demo_request_id).first()
+            if not demo_request:
+                return Response({'error': 'Demo Request not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Track if any updates were made
+            updated = False
+
+            # Loop through provided fields and update them
+            demo_request.sales_person_id = 10
+            demo_request.save()
+
+            # Save only if any field is updated
+            if updated:
+                demo_request.save()
+                return Response({'message': 'Demo Request updated successfully'}, status=status.HTTP_200_OK)
+            else:
+                return Response({'message': 'No changes were made'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

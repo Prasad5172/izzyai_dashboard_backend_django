@@ -299,7 +299,7 @@ class GetClinicRevenueBySalesPerson(APIView):
                     revenue=Coalesce(
                         Sum(
                             'user_profiles__user__payments__amount',
-                            filter=Q(user_profiles__user__payments__payment_status='Paid'),
+                            filter=Q(user_profiles__user__payments__payment_date__gte=date_filter) & Q(user_profiles__user__payments__payment_status='Paid'),
                             output_field=FloatField()
                         ), Value(0.0, output_field=FloatField())
                     )
@@ -433,7 +433,7 @@ class GetSalesBySalesPerson(APIView):
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'} , status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-#/salespersons_ids
+#/salespersons_ids,
 class GetSalesPersonsIdsNames(APIView):
     def get(self , request ):
         try:

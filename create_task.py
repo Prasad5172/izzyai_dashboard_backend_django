@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta,datetime
 
 
 def create_users(n):
@@ -65,8 +65,8 @@ def create_profiles(users):
             gender=random.choice(["Male", "Female", "Other"]),
             country=fake.country(),
             state=fake.state(),
-            status=random.choice(["Active", "Inactive"]),
-            patient_status=random.choice(["New", "Returning"]),
+            status=random.choice(["Active","Inactive", "Archived"]), #Archived means session is completed with slp
+            patient_status=random.choice(["New", "Completed"]),
             age=random.randint(6, 80),
         )
         profiles.append(profile)
@@ -320,7 +320,7 @@ def create_slp_appoinments(n,users,slps,disorders):
             slp=random.choice(slps),
             user=users[20+i],
             appointment_date=fake.date_this_year(),
-            session_type=random.choice(["Assessment", "Exercise","Language Therapy"]),
+            session_type=random.choice(["Assessment", "Treatment"]),
             appointment_status = random.choice(["Attended", "Canceled","Pending"]),
             start_time=fake.date_time_this_year(),
             end_time=fake.date_time_this_year(),
@@ -347,7 +347,10 @@ def create_clinic_appointments(n,users,clinics,slps,disorders):
     fake: Faker = Faker()
     clinic_appointments = []
     for i in range(n):
-        date =fake.date_time_this_year()
+        date_str =fake.date()
+        time_str = fake.time()
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()  # Convert to date object
+        time_obj = datetime.strptime(time_str, "%H:%M:%S").time()
         clinic = clinics[i%10]
         slp = slps[i%10]
         clinic_appointment = ClinicAppointments.objects.create(
@@ -355,9 +358,9 @@ def create_clinic_appointments(n,users,clinics,slps,disorders):
             slp = slp,#this should be clinic slps
             session_type=random.choice(["Assessment", "Exercise","Language Therapy"]),
             appointment_status = random.choice(["Attended", "Canceled","Pending"]),
-            appointment_date = date,
-            appointment_start = date,
-            appointment_end = date + timedelta(days=1),
+            appointment_date = date_str,
+            appointment_start = time_str,
+            appointment_end = (datetime.combine(date_obj, time_obj) + timedelta(hours=1)).time(),
             disorder = random.choice(disorders),
             user = users[i%30+20],
         )

@@ -49,7 +49,6 @@ class Invoice(models.Model):
     amount = models.BigIntegerField(default=0)
 
     def __str__(self):
-        
         return f"Invoice {self.invoice_id} - {self.customer_name}"
 
 

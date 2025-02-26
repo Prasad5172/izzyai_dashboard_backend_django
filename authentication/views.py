@@ -4,7 +4,9 @@ from rest_framework import status
 from django.contrib.auth import authenticate
 from django.core.mail import send_mail
 import random
+from datetime import datetime,date
 from django.core.files.storage import FileSystemStorage
+from django.db.models import Count,Q
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.crypto import get_random_string
@@ -14,10 +16,10 @@ from django.conf import settings
 from django.utils.timezone import now
 from datetime import timedelta
 from django.contrib.auth import authenticate
-from authentication.models import CustomUser
+from authentication.models import CustomUser,UsersInsurance
 from slp.models import Slps
 from sales_person.models import SalePersons
-from clinic.models import Clinics
+from clinic.models import Clinics,Tasks
 from sales_director.models import SalesDirector
 from adminer.models import Adminer
 from payment.models import Subscriptions
@@ -482,3 +484,61 @@ class CustomTokenRefreshView(APIView):
         except Exception as e:
             # If an unexpected error occurs during token refresh, return an error response
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+#/get_all_user_insurance
+#/get_user_insurance/<int:user_id> #query paramate of userid
+#/update_user_insurance
+class UserInsurancesView(APIView):
+    def get(self, request):
+        try:
+            user_id = request.GET.get('user_id', None)
+            if user_id:
+                user_insurances = UsersInsurance.objects.filter(
+                    user_id=user_id
+                ).values(
+                    "claim_date","insurance_status","user_id","insurance_provider","policy_number","cpt_number"
+                )
+            else:
+                # Retrieve all user insurance claims
+                user_insurances = UsersInsurance.objects.all().values(
+                    "claim_date","insurance_status","user_id","insurance_provider","policy_number","cpt_number"
+                )
+            return Response(user_insurances,status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+    def put(self,request):
+        try:
+            user_id = request.data.get('user_id')
+            claim_date = request.data.get('claim_date')
+            insurance_status = request.data.get('insurance_status')
+            rows_effected = UsersInsurance.objects.filter(
+                user_id=user_id,
+            ).update(
+                claim_date=claim_date,
+                insurance_status=insurance_status
+            )
+            if rows_effected == 0:
+                return Response({'message': 'User not found'},status=status.HTTP_404_NOT_FOUND)
+            return Response({'message': 'User insurance updated successfully'},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+
+#/get_insurance_claim_percent
+class InsuranceClaimPercantageView(APIView):
+    def get(self, request):
+        try:
+            # Query to get today's registrations where InsuranceStatus is 'Processing'
+            claims = UsersInsurance.objects.filter(
+                insurance_status='Processing'
+            ).aggregate(
+                todays_claims=Count('insurance_id', filter=Q(claim_date=date.today())),
+                total_claims=Count('insurance_id',distinct=True)
+            )
+            print(claims)
+            # Calculate percentage
+            registration_percentage = round((claims['todays_claims'] * 100.0) / claims['total_claims'], 2) if claims['total_claims'] > 0 else 0.0
+            
+            return Response({registration_percentage},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+
