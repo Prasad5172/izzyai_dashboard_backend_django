@@ -25,7 +25,6 @@ import fitz  # PyMuPDF
 import zipfile
 from pypdf import PdfReader, PdfWriter
 from PIL import Image, ImageEnhance
-import aspose.words as aw
 import tempfile
 import re
 from clinic.models import DemoRequested

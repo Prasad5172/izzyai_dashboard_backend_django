@@ -53,3 +53,5 @@ pypng
 zopfli
 docx
 whitenoise
+django-environ
+pypdf
