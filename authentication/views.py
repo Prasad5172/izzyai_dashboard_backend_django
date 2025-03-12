@@ -6,7 +6,8 @@ from django.core.mail import send_mail
 import random
 from datetime import datetime,date
 from django.core.files.storage import FileSystemStorage
-from django.db.models import Count,Q
+from django.db.models import Count,Q,Sum,Value,Max,F,Case,OuterRef,Subquery,DateTimeField,FloatField,When
+from django.db.models.functions import Coalesce
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.crypto import get_random_string
@@ -16,14 +17,31 @@ from django.conf import settings
 from django.utils.timezone import now
 from datetime import timedelta
 from django.contrib.auth import authenticate
-from authentication.models import CustomUser,UsersInsurance
+from authentication.models import CustomUser,UsersInsurance,UserProfile
 from slp.models import Slps
 from sales_person.models import SalePersons
 from clinic.models import Clinics,Tasks
 from sales_director.models import SalesDirector
 from adminer.models import Adminer
-from payment.models import Subscriptions
+from payment.models import Subscriptions,Payment
 from utils.otp import generate_otp_for_signup
+from django.shortcuts import get_object_or_404
+from clinic.models import AssessmentResults,Sessions
+import json
+import os
+from django.core.files.storage import default_storage
+from clinic.models import PatientFiles
+from authentication.models import UserExercises,UserFiles
+
+def get_date_filter(time_filter):
+    date_filter =None
+    if time_filter == 'last_month':
+        date_filter = now() - timedelta(days=30)
+    elif time_filter == 'annual':
+        date_filter = now() - timedelta(days=365)
+    return date_filter
+
+######## ----- AUTHENTICATION ----- ########
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
 
@@ -279,7 +297,7 @@ class ClinicSignupAPIView(APIView):
         phone = request.data.get('Phone')
         state = request.data.get('State')
         country = request.data.get('Country')
-        sale_person_id = request.data.get('SalePersonID')  
+        sales_person_id = request.data.get('SalePersonID')  
         slp_count = request.data.get('SlpCount')
         total_patient = request.data.get('TotalPatients')
         izzyai_patients = request.data.get('IzzyAiPatients')
@@ -294,7 +312,7 @@ class ClinicSignupAPIView(APIView):
             raise InvalidToken("Not Registred")
         if(user and not user.verified):
             return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
-        sale_person = SalePersons.objects.get(sale_person_id=sale_person_id)
+        sales_person = SalePersons.objects.get(sales_person_id=sales_person_id)
         # Create the user
         try :
             Clinics.objects.create(
@@ -308,7 +326,7 @@ class ClinicSignupAPIView(APIView):
                 slp_count=slp_count,
                 ein_number=ein_number,
                 izzyai_patients = izzyai_patients,
-                sale_person_id = sale_person
+                sales_person_id = sales_person
             )
 
             user.user_type = user_type
@@ -364,7 +382,6 @@ class SendOTPForSignupView(APIView):
 
 class VerifyOTPView(APIView):
     # permission_classes = [IsAuthenticated]
-
     def post(self, request):
         email = request.data.get('email')
         otp = request.data.get('otp')
@@ -388,7 +405,6 @@ class VerifyOTPView(APIView):
 
 class UpdatePasswordView(APIView):
     # permission_classes = [IsAuthenticated]
-
     def post(self, request):
         """
         Update user's password.
@@ -464,7 +480,6 @@ class LoginAPIView(APIView):
 
 # APIView to handle token refresh requests
 class CustomTokenRefreshView(APIView):
-    # permission_classes = [AllowAny]  # Ensure the user is authenticated
 
     def post(self, request, *args, **kwargs):
         refresh_token = request.data.get('refresh')
@@ -485,9 +500,14 @@ class CustomTokenRefreshView(APIView):
             # If an unexpected error occurs during token refresh, return an error response
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+######## ----- END OF AUTHENTICATION ----- ########
+
+
+######## ----- USER ROUTES ----- ########
 #/get_all_user_insurance
 #/get_user_insurance/<int:user_id> #query paramate of userid
 #/update_user_insurance
+#/get_patient_insurance/<int:user_id> #management screen
 class UserInsurancesView(APIView):
     def get(self, request):
         try:
@@ -496,12 +516,12 @@ class UserInsurancesView(APIView):
                 user_insurances = UsersInsurance.objects.filter(
                     user_id=user_id
                 ).values(
-                    "claim_date","insurance_status","user_id","insurance_provider","policy_number","cpt_number"
+                    'insurance_id',"claim_date","insurance_status","user_id","insurance_provider","policy_number","cpt_number"
                 )
             else:
                 # Retrieve all user insurance claims
                 user_insurances = UsersInsurance.objects.all().values(
-                    "claim_date","insurance_status","user_id","insurance_provider","policy_number","cpt_number"
+                    'insurance_id',"claim_date","insurance_status","user_id","insurance_provider","policy_number","cpt_number"
                 )
             return Response(user_insurances,status=status.HTTP_200_OK)
         except Exception as e:
@@ -542,3 +562,305 @@ class InsuranceClaimPercantageView(APIView):
         except Exception as e:
             return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
 
+
+#/get_patient/<int:UserID>
+#/update_user_location/<int:user_id>
+#/update_patient/<int:UserID>
+#/get_patient_ids/<int:clinic_id>
+#/update_user_location_by_admin/<int:UserID>
+#/get_user_details/<int:user_id>
+#/get_patient_clinic_details/<int:user_id>
+#/get_user_profile/<int:UserID>
+#/update_user_profile/<int:UserID>
+class UserProfileView(APIView):
+    def get(self,request,user_id):
+        try:
+            user_id = request.GET.get('user_id')
+            user = UserProfile.objects.filter(user_id=user_id).select_related("clinic",'user').values("full_name",'user__username','dob','user__email','status',"age","gender","country","state","clinic_id","contact_number","clinic__clinic_name","clinic__address").first()
+            user_details = {
+                'user_id': user_id,
+                'full_name': user['full_name'],
+                'age': user['age'],
+                'dob': user['dob'],
+                'gender': user['gender'],
+                'country': user['country'],
+                'state': user['state'],
+                'status': user['status'],
+                'clinic_id': user['clinic_id'],
+                'clinic_name':user['clinic__clinic_name'],
+                'address': user['clinic__address'],
+                'contract_number':user['contact_number'],
+                'email': user['user__email'],
+                'username': user['user__username'],
+            }
+            return Response(user_details,status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
+    def put(self,request,user_id):
+        try:
+            # Fetch the UserProfile object with related User model in a single query
+            user_profile = UserProfile.objects.select_related("user").get(user_id=user_id)
+
+            # Fields to update in UserProfile
+            updatable_fields = ["full_name", "gender", "country", "state", "contact_number", "dob", "age"]
+            updated_fields = {}
+
+            for field in updatable_fields:
+                if field in request.data:
+                    updated_fields[field] = request.data[field]
+
+            if updated_fields:
+                for field, value in updated_fields.items():
+                    setattr(user_profile, field, value)
+                user_profile.save(update_fields=updated_fields.keys())  # Save only updated fields
+
+            # Update User model fields (username & email)
+            user = user_profile.user
+            user_updated_fields = {}
+            username = request.data["username"]
+            email = request.data["email"]
+            if "username" in request.data and username != user.username:
+                user_updated_fields["username"] = username
+
+            if "email" in request.data and email != user.email:
+                user_updated_fields["email"] = email
+
+            if user_updated_fields:
+                for field, value in user_updated_fields.items():
+                    setattr(user, field, value)
+                user.save(update_fields=user_updated_fields.keys()) 
+
+            return Response({'message': 'Patient Profile updated successfully'}, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
+
+#/get_users_details
+class CustomeUserOverview(APIView):
+    def get(self,request):
+        try:
+            time_filter = request.GET.get("time_filter", None)
+            date_filter =get_date_filter(time_filter)
+
+            # Subquery to get latest payment date per user
+            latest_payment_subquery = Payment.objects.filter(
+                user_id=OuterRef("user_id"),
+                payment_status="Paid"
+            ).order_by("-payment_date").values("payment_date")[:1]
+
+            # Subquery to get the latest plan per user
+            latest_plan_subquery = Payment.objects.filter(
+                user_id=OuterRef("user_id"),
+                payment_status="Paid"
+            ).order_by("-payment_date").values("plan")[:1]
+
+            user_profile_subquery = UserProfile.objects.filter(
+                user_id=OuterRef("user_id")
+            ).values("country","state")[:1]
+            
+            # Query users including those with zero revenue
+            users = CustomUser.objects.filter(
+                user_type="patient",
+                created_account__gte=date_filter if date_filter else None
+            ).select_related(
+                "user_profile"
+            ).prefetch_related(
+                "payments"
+            ).annotate(
+                revenue_generated=Coalesce(
+                    Sum("payments__amount", filter=Q(payments__payment_status="Paid")), 
+                    Value(0.0 ,output_field=FloatField())  # Default to zero if no payments exist
+                ),
+                latest_payment_date=Coalesce(Subquery(latest_payment_subquery), Value(None),output_field=DateTimeField()),
+                latest_plan=Coalesce(Subquery(latest_plan_subquery),Value(None),),
+                country=Coalesce(Subquery(user_profile_subquery.values("country")),Value(None)),
+                state=Coalesce(Subquery(user_profile_subquery.values("state")), Value(""),),
+            ).values(
+                "user_id","revenue_generated","latest_plan","latest_payment_date","country","state","created_account"
+            )
+
+            # Determine user status dynamically
+            user_status_updates = []
+            for user in users:
+                status = "Inactive"
+                if user["latest_payment_date"] and user["latest_plan"]:
+                    if user["latest_plan"] == "Monthly" and user["latest_payment_date"] >= now() - timedelta(days=30):
+                        status = "Active"
+                    elif user["latest_plan"] == "Annual" and user["latest_payment_date"] >= now() - timedelta(days=365):
+                        status = "Active"
+
+                # Append updates instead of querying one by one
+                user_status_updates.append((user["user_id"], status))
+
+            # Perform Bulk Update in One Query
+            UserProfile.objects.filter(user_id__in=[user[0] for user in user_status_updates]).update(
+                status=Case(
+                    *[When(user_id=user_id, then=Value(status)) for user_id, status in user_status_updates],
+                    default=F("status")  # Keep existing status if no change
+                )
+            )
+            #  Generate response list
+            user_list = [
+                {
+                    "UserID": user["user_id"],
+                    "RevenueGenerated": user["revenue_generated"],
+                    "Country": user["country"],
+                    "State": user["state"],
+                    "Status": dict(user_status_updates).get(user["user_id"], "Inactive"),
+                    "CreatedAccount": user["created_account"],
+                }
+                for user in users
+            ]
+
+            return Response(user_list, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+#/get_users_revenue_details
+class CustomUserRevenueView(APIView):
+    def get(self,request):
+        try:
+            time_filter = request.GET.get("time_filter", None)
+            date_filter =get_date_filter(time_filter)
+            
+            # Query users including those with zero revenue
+            users = CustomUser.objects.filter(
+                user_type="patient",
+                created_account__gte=date_filter if date_filter else None
+            ).annotate(
+                revenue_generated=Coalesce(
+                    Sum("payments__amount", filter=Q(payments__payment_status="Paid")), 
+                    Value(0.0 ,output_field=FloatField())  # Default to zero if no payments exist
+                ),
+            ).values(
+                "user_id","revenue_generated","username","created_account"
+            )
+            return Response(users,status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+
+#/get_total_users_revenue
+class TotalUsersTotalRevenue(APIView):
+    def get(self,request):
+            try:
+                time_filter = request.GET.get("time_filter", None)
+                date_filter =get_date_filter(time_filter)
+                
+                query_result = CustomUser.objects.filter(
+                    user_type="patient"
+                ).aggregate(
+                    total_users = Count("user_id",distinct=True),
+                    total_revenue=Coalesce(
+                        Sum(
+                            "payments__amount",  # Correct field reference
+                            filter=Q(payments__payment_status="Paid") & Q(payments__payment_date__gte=date_filter)
+                        ),
+                        Value(0.0, output_field=FloatField())  # Ensure correct type
+                    )
+                )
+                return Response(query_result,status=status.HTTP_200_OK)
+            except Exception as e:
+                return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+
+#/get_user_entries
+class GetUserEntriesView(APIView):
+    def get(self,request):
+        try:
+            user_type = request.GET.get('user_type')  # Use request.GET for Django, not request.args
+
+            if user_type not in ['Clinic', 'Patient']:
+                return Response({'error': 'Invalid UserType. Must be "Clinic" or "Patient".'}, status=400)
+
+            # Optimized Query
+            if user_type == 'clinic':
+                # Get clinic users
+                user_data = Clinics.objects.filter(
+                    user__user_type='clinic'
+                    ).values('user_id','clinic_name')
+            else:
+                # Get patient users
+                user_data = UserProfile.objects.filter(
+                    user__user_type='patient'
+                    ).values('user_id','full_name')
+
+            return Response(user_data,status=status.HTTP_200_OK)
+        except Exception as e:
+           return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+
+class UploadFileView(APIView):
+    def post(self,request):
+        try:
+            file = request.data.get('file')
+            user_id = request.GET.get('user_id')
+            role = request.GET.get('role')
+            document_type = request.GET.get('document_type')
+            diagnosis_name = request.GET.get('diagnosis_name', None)  # Optional field
+            file_name = file.name #better to implement the file and '_count' count-count of userfiles till now
+
+            # Validate input fields
+            if not file:
+                return Response({'error': 'No file provided'}, status=400)
+            print(user_id,role,document_type)
+            if not user_id or not role or not document_type:
+                return Response({'error': 'UserID, Role, and DocumentType are required'}, status=400)
+            user = CustomUser.objects.get(user_id=user_id)  # Fetch user object
+
+            # Secure the filename
+            file_extension = os.path.splitext(file.name)[1]
+            if diagnosis_name:
+                filename = f"{document_type}_{diagnosis_name}{file_extension}"
+            else:
+                filename = f"{document_type}{file_extension}"
+
+            # Save the file using Django's storage system
+            file_path = default_storage.save(f"uploads/{role}/{user_id}/{filename}", file)
+
+            # Save file details in the database
+            patient_file = PatientFiles.objects.create(
+                user=user,
+                role=role,
+                document_type=document_type,
+                diagnosis_name=diagnosis_name,
+                file_path=file_path,
+                file_name=filename,
+            )
+            return Response({
+                'message': 'File uploaded successfully',
+                'user_id': user_id,
+                'role': role,
+                'document_type': document_type,
+                'diagnosis_name': diagnosis_name,
+                'file_name': filename,
+                'file_path': file_path
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class GetFilesView(APIView):
+    def get(self, request):
+        try:
+            user_id = request.GET.get('user_id')
+
+            if not user_id:
+                return Response({'error': 'UserID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Fetch user files using Django ORM
+            files = UserFiles.objects.filter(user_id=user_id)
+
+            if not files.exists():
+                return Response({'message': 'No files found for this user.'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Convert query results to JSON
+            files_list = [{
+                'FileID': file.file_id,  # Assuming `id` is the primary key
+                'FileName': file.file_name,
+                'FilePath': file.file_path if file.file_path else None,  # If using FileField
+                'UploadTimestamp': file.upload_timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            } for file in files]
+
+            return Response({'UserID': user_id, 'Files': files_list}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

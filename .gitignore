@@ -1,3 +1,11 @@
-env
+venv
+.venv
+./venv
 migrations
 __pycache__
+.env
+*.pyc
+venv/
+.venv/
+media/
+.media/

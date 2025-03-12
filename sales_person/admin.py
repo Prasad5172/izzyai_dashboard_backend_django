@@ -5,15 +5,15 @@ from .models import (
 # Register your models here.
 @admin.register(SalePersonActivityLog)
 class SalePersonActivityLogAdmin(admin.ModelAdmin):
-    list_display = ('sale_person_id', 'meetings', 'qualifying_calls', 'renewal_calls', 'proposals_sent', 'date')
-    search_fields = ('sale_person_id',)
+    list_display = ('sales_person_id', 'meetings', 'qualifying_calls', 'renewal_calls', 'proposals_sent', 'date')
+    search_fields = ('sales_person_id',)
     list_filter = ('date',)
 
 
 @admin.register(SalePersonPipeline)
 class SalePersonPipelineAdmin(admin.ModelAdmin):
-    list_display = ('sale_person_id', 'qualified_sales', 'renewals', 'prospective_sales', 'closed_sales', 'date')
-    search_fields = ('sale_person_id',)
+    list_display = ('sales_person_id', 'qualified_sales', 'renewals', 'prospective_sales', 'closed_sales', 'date')
+    search_fields = ('sales_person_id',)
     list_filter = ('date',)
 
 
@@ -25,6 +25,6 @@ class SalePersonAdmin(admin.ModelAdmin):
 
 @admin.register(SalesTarget)
 class SalesTargetAdmin(admin.ModelAdmin):
-    list_display = ('sale_person_id', 'month', 'year', 'target')
-    search_fields = ('sale_person_id',)
+    list_display = ('sales_person_id', 'month', 'year', 'target')
+    search_fields = ('sales_person_id',)
     list_filter = ('month', 'year')

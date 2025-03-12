@@ -17,7 +17,7 @@ class Payment(models.Model):
     payment_method_id = models.CharField(max_length=255 , unique=True)
     invoice_id = models.CharField(max_length=255 , unique=True)
     subscription = models.ForeignKey('payment.Subscriptions', on_delete=models.CASCADE)
-    status = models.CharField(max_length=255)
+    status = models.CharField(max_length=255)#dont know why
     payment_date = models.DateTimeField(null=True, blank=True)
     amount = models.FloatField(default=0)
     #user_id = models.IntegerField(unique=True)
@@ -27,7 +27,7 @@ class Payment(models.Model):
     subscription_end_date = models.DateTimeField(null=True, blank=True)
     payment_failures = models.IntegerField(default=0)
     has_used_trial = models.BooleanField(default=False)
-    payment_status = models.CharField(max_length=255)
+    payment_status = models.CharField(max_length=255)# this is paid or not
 
     def __str__(self):
         return f"Payment {self.payment_id} - {self.owner_name}"
@@ -61,7 +61,7 @@ class Coupon(models.Model):
     user = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE) # This should be a ForeignKey to User model
     discount = models.IntegerField()
     expiration_date = models.DateField()
-    redemption_count = models.IntegerField()
+    redemption_count = models.IntegerField(default=0)
 
     def __str__(self):
         return f"Coupon {self.code} - Discount {self.discount}%"

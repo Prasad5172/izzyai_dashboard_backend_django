@@ -7,12 +7,14 @@ from django.utils.crypto import get_random_string
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 import time
+from datetime import date
 from authentication.models import UserProfile , CustomUser
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
-from django.db.models import Sum, Count, F, Q, FloatField,Value,CharField,OuterRef,Subquery,When,Case,ExpressionWrapper,fields
+from django.db.models import Sum, Count, F, Q, FloatField,Value,CharField,OuterRef,Subquery,When,Case,ExpressionWrapper,fields,Prefetch
 from django.db.models.functions import Coalesce
+from itertools import chain
 from datetime import timedelta,datetime
 from django.utils.timezone import now
 from django.utils import timezone
@@ -20,6 +22,8 @@ from authentication.models import CustomUser ,UserProfile
 from clinic.models import Clinics,DemoRequested,ClinicAppointments,Disorders,ClinicUserReminders,Tasks
 from payment.models import Payment,Invoice
 from slp.models import Slps
+from .models import AssessmentResults
+from slp.models import SlpAppointments
 
 def get_date_obj(date_str):
     try:
@@ -31,8 +35,17 @@ def get_time_obj(time_str):
         return datetime.strptime(time_str, '%H:%M:%S').time()
     except ValueError:
         return None
-    
+
+def get_date_filter(time_filter):
+    date_filter =None
+    if time_filter == 'last_month':
+        date_filter = now() - timedelta(days=30)
+    elif time_filter == 'annual':
+        date_filter = now() - timedelta(days=365)
+    return date_filter
+
 #/get_clinics
+#/get_clinics_ids
 class GetClinicsWithIdName(APIView):
     def get(self,request):
         try:
@@ -40,47 +53,6 @@ class GetClinicsWithIdName(APIView):
             return Response(clinics,status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'} , status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-#/get_patient/<int:UserID>
-#/update_user_location/<int:user_id>
-#/update_patient/<int:UserID>
-#/get_patient_ids/<int:clinic_id>
-class Patient(APIView):
-    def get(self,request,user_id):
-        try:
-            patients = UserProfile.objects.filter(
-                user_id=user_id
-            ).annotate(
-                email = F("user__email"),
-                username = F("user__username"),
-            ).values("user_id","email","username","dob","gender","state","country","fullname").first()
-            return Response({patients},status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
-    def put(self,request,user_id):
-        try:
-            # Fetch the salesperson object
-            salesperson = UserProfile.objects.filter(user_id=user_id).first()
-            if not salesperson:
-                return Response({'error': 'SalePerson not found'}, status=status.HTTP_404_NOT_FOUND)
-
-            # Fields to update
-            updatable_fields = ["full_name", "gender", "country", "state", "contact_number", "dob","age"]
-
-            # Loop through provided fields and update them
-            for field in updatable_fields:
-                value = request.data.get(field)
-                if value is not None:  # Update only if field is provided
-                    setattr(salesperson, field, value)
-
-            # Save only if any field is updated
-            salesperson.save()
-
-            return Response({'message': 'Patient Profile updated successfully'}, status=status.HTTP_200_OK)
-            return 
-        except Exception as e:
-            return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
-
 
 #/get_patient_contact_details/<int:clinic_id>
 class ClinicPatients(APIView):
@@ -97,34 +69,59 @@ class ClinicPatients(APIView):
 class ClinicOverview(APIView):
     def get(self , request , clinic_id):
         try:
-            revenue_per_clinic_subquery = Clinics.objects.filter(
-                    clinic_id=clinic_id
-                ).annotate(
-                    revenue=Coalesce(
-                        Sum(
-                            'user_profiles__user__payments__amount',
-                            filter=Q(user_profiles__user__payments__payment_status='Paid'),
-                            output_field=FloatField()
-                        ), Value(0.0, output_field=FloatField())
+            time_filter = request.GET.get("time_filter")
+            date_filter = get_date_filter(time_filter)
+
+            # Prefetch related users and payments efficiently
+            user_profiles_prefetch = Prefetch(
+                "user_profiles",
+                queryset=UserProfile.objects.select_related("user").prefetch_related(
+                    Prefetch(
+                        "user__payments",
+                        queryset=Payment.objects.filter(payment_status="Paid"),
+                        to_attr="filtered_payments"
+                    )
+                ),
+                to_attr="prefetched_user_profiles"
+            )
+
+            revenue_per_clinic_subquery = Clinics.objects.prefetch_related(user_profiles_prefetch).filter(
+                clinic_id=clinic_id
+            ).annotate(
+                revenue=Coalesce(
+                    Sum(
+                        'user_profiles__user__payments__amount',
+                        filter=Q(user_profiles__user__payments__payment_status='Paid'),
+                        output_field=FloatField()
                     ),
-                    patients = Count("user_profiles")
-                ).values('revenue',"patients").first()
-            return Response({revenue_per_clinic_subquery},status=status.HTTP_200_OK)
+                    Value(0.0, output_field=FloatField())
+                ),
+                patients=Count(
+                    "user_profiles",
+                    filter=Q(user_profiles__user__created_account__date__gte=date_filter)
+                )
+            ).values('revenue', "patients").first()
+            return Response(revenue_per_clinic_subquery,status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'} , status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 #/get_patient_details/<int:clinic_id>
+#/get_payment_tracking/<int:clinic_id>
 class PatientOverview(APIView):
     def get(self,request,clinic_id):
         try:
+            time_filter = request.GET.get("time_filter")
+            date_filter = get_date_filter(time_filter)
+
             revenue_per_patient = UserProfile.objects.filter(
                 clinic_id=clinic_id, 
                 user__payments__payment_status="Paid"
                 ).annotate(
-                    total_revenue=Sum("user__payments__amount"),
-                    username = F("user__username")
-                ).values("user_id", "username","country","state","status", "total_revenue")  # Adjust fields as needed
-            return Response({revenue_per_patient},status=status.HTTP_200_OK)
+                    revenue_generated=Sum("user__payments__amount",filter=Q(user__payments__payment_date__gte=date_filter)),
+                    username = F("user__username"),
+                    created_account = F("user__created_account")
+                ).values("user_id", "username","country","state","status", "revenue_generated","created_account")
+            return Response(revenue_per_patient,status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
 
@@ -319,9 +316,9 @@ class ClinicAppointmentsApi(APIView):
 #/reschedule_appointment_clinic/<int:appointment_id>
 class ResecheduleAppointment(APIView):
     def put(self, request,appointment_id):
-        reschedule_date = request.POST.get('RescheduleDate')
-        appointment_start = request.POST.get('AppointmentStart')
-        appointment_end = request.POST.get('AppointmentEnd')
+        reschedule_date = request.GET.get('RescheduleDate')
+        appointment_start = request.GET.get('AppointmentStart')
+        appointment_end = request.GET.get('AppointmentEnd')
 
         if not appointment_id or not reschedule_date or not appointment_start or not appointment_end:
             return Response({'error': 'All required fields must be provided for rescheduling.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -331,7 +328,7 @@ class ResecheduleAppointment(APIView):
             date_obj = datetime.strptime(appointment_start, "%Y-%m-%d").date()  # Convert to date object
             time_obj = datetime.strptime(appointment_end, "%H:%M:%S").time()
 
-            rows_affected = ClinicAppointments.objects.filter(appointment_id=1).update(
+            rows_affected = ClinicAppointments.objects.filter(appointment_id=appointment_id).update(
                 appointment_status="Rescheduled",
                 appointment_date=reschedule_date,
                 appointment_start=appointment_start,
@@ -560,6 +557,7 @@ class CreateTask(APIView):
             return Response({"clinic_id":clinic_id,"tasks":list(clinic_tasks)},status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+
 #/generate_invoice_report/<int:clinic_id>
 class ClinicInvoiceReport(APIView):
     def get(self,request,clinic_id):
@@ -673,16 +671,17 @@ class ClinicAttendanceTracking(APIView):
 class DemoRequests(APIView):
     def get(self , request):
         try:
-            saleperson_id = request.GET.get('SlpId', None) 
+            sales_person_id = request.GET.get('sales_person_id', None)
             # Fetch the salesperson object
-            if(saleperson_id is None):
+            if(sales_person_id is None):
                 result = DemoRequested.objects.all().values()
-                return Response({'demo_requests': list(result)}, status=status.HTTP_200_OK)
+                return Response(list(result), status=status.HTTP_200_OK)
             
-            salesperson_demo_requests = DemoRequested.objects.filter(sale_person_id=saleperson_id).first()
-            if not salesperson_demo_requests.exists():
+            salesperson_demo_requests = DemoRequested.objects.filter(sales_person_id=sales_person_id)
+            if len(salesperson_demo_requests)==0:
                 return Response({'demo_requests': [], "message": "No demo requests found"}, status=status.HTTP_200_OK)
-            return Response({'demo_requests': list(salesperson_demo_requests.values())}, status=status.HTTP_200_OK) 
+            
+            return Response(list(salesperson_demo_requests.values()), status=status.HTTP_200_OK) 
 
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -716,3 +715,311 @@ class DemoRequests(APIView):
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+#/assign_salesperson
+class AssignSalePersonToDemoRequest(APIView):
+    def put(self, request):
+        try:
+            demo_request_id = request.data.get('demo_request_id')
+            sales_person_id = request.data.get("sales_person_id")
+            
+            if(sales_person_id is None):
+                return Response({"error":"sale_person_id is required"},status=status.HTTP_400_BAD_REQUEST)
+            # Fetch the demo request object
+            demo_request = DemoRequested.objects.filter(demo_request_id=demo_request_id).first()
+            if not demo_request:
+                return Response({'error': 'Demo Request not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+            # Loop through provided fields and update them
+            demo_request.sales_person_id = sales_person_id
+            demo_request.save()
+
+            # Save only if any field is updated
+            return Response({'message': 'Demo Request updated successfully'}, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+############### Clinics Screen ##########################
+#/get_total_clinics
+#/get_total_clinic_revenue
+
+class GetTotalClinics(APIView):
+    def get(self,request):
+            try:
+                location = request.GET.get('location', None)
+
+                # Filter clinics by location
+                clinics_by_location = Clinics.objects.filter(state=location).prefetch_related(
+                    "user_profiles__user__payments"
+                )
+                # Annotate each clinic with its stats
+                clinics = clinics_by_location.annotate(
+                    patients_per_clinic=Count("user_profiles__user", distinct=True),
+                    slps_per_clinic=Count("user_profiles__slp", distinct=True),
+                    revenue_per_clinic=Coalesce(
+                        Sum(
+                            "user_profiles__user__payments__amount",
+                            filter=Q(user_profiles__user__payments__payment_status="Paid"),
+                            output_field=FloatField(),
+                        ),
+                        Value(0.0, output_field=FloatField()),
+                    ),
+                    location=F("state"),
+                ).values(
+                    "clinic_name", "location", "patients_per_clinic", "slps_per_clinic", "revenue_per_clinic"
+                )
+                
+                # Single query to get total revenue and clinic count
+                clinic_totals = clinics_by_location.aggregate(
+                    total_clinics=Count("clinic_name", distinct=True),
+                    total_revenue=Coalesce(
+                        Sum(
+                            "user_profiles__user__payments__amount",
+                            filter=Q(user_profiles__user__payments__payment_status="Paid"),
+                            output_field=FloatField(),
+                        ),
+                        Value(0.0, output_field=FloatField()),
+                    ),
+                )
+
+                response_data = {
+                    "total_clinics": clinic_totals["total_clinics"],
+                    "total_revenue": clinic_totals["total_revenue"],
+                    "clinics": list(clinics),
+                }
+                return Response(response_data, status=status.HTTP_200_OK)
+            except Exception as e:
+                return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+
+#/get_clinic_revenue_percentage
+class GetClinicRevenuePercentage(APIView):
+    def get(self,request):
+        try:
+            time_filter = request.GET.get('time_filter')  # Get time filter from request
+            date_filter =get_date_filter(time_filter)
+
+            query_result = CustomUser.objects.filter(
+                user_type="clinic",
+            ).aggregate(
+                todays_revenue=Coalesce(
+                    Sum('payments__amount', filter=Q(payments__payment_date__date=date.today()) & Q(payments__payment_status='Paid')),
+                    Value(0.0, output_field=FloatField())
+                    ),
+                total_revenue=Coalesce(
+                    Sum('payments__amount', filter=Q(payments__payment_date__gte=date_filter) & Q(payments__payment_status='Paid')),
+                    Value(0.0, output_field=FloatField())
+                    ),
+            )
+            todays_revenue = query_result['todays_revenue']
+            total_revenue = query_result['total_revenue']
+            if total_revenue > 0:
+                revenue_percentage = round((todays_revenue * 100.0) / total_revenue,2)
+            else:
+                revenue_percentage = 0.0
+
+            return Response({revenue_percentage}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+#/get_clinic_reg_percentage
+class GetClinicRegistractionPercentage(APIView):
+    def get(self,request):
+            try:
+                time_filter = request.GET.get('time_filter')  # Get time filter from request
+                date_filter = get_date_filter(time_filter)
+
+                query_result = CustomUser.objects.filter(
+                    user_type="clinic",
+                ).aggregate(
+                    todays_registrations=Count('user_id', filter=Q(created_account__date=date.today())),
+                    total_registrations=Count("user_id", filter=Q(created_account__gte=date_filter) if date_filter else Q())
+                )
+                todays_registrations = query_result['todays_registrations']
+                total_registrations = query_result['total_registrations']
+                if total_registrations > 0:
+                    registration_percentage = round((todays_registrations * 100.0) / total_registrations,2)
+                else:
+                    registration_percentage = 0.0
+
+                return Response({registration_percentage},status=status.HTTP_200_OK)
+            except Exception as e:
+                return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+
+#/get_clinic_details
+class ClinicDetails(APIView):
+    def get(self,request):
+            try:
+                location = request.GET.get("location", None)
+                clinics_by_location = Clinics.objects.filter(state=location).prefetch_related(
+                    "user_profiles__user__payments"
+                )
+                if(location):
+                    query_result = clinics_by_location.annotate(
+                        total_users=Count('user_profiles',distinct=True),
+                        total_slps = Count('slps',distinct=True),
+                        revenue_per_clinic = Coalesce(
+                            Sum(
+                                "user_profiles__user__payments__amount",
+                                filter=Q(user_profiles__user__payments__payment_status="Paid"),
+                                output_field=FloatField(),
+                            ),
+                            Value(0.0, output_field=FloatField()),
+                        )
+                    ).values("clinic_name","clinic_id","total_users","total_slps","revenue_per_clinic")
+                else:
+                    query_result = clinics_by_location.annotate(
+                        total_users=Count('user_profiles',distinct=True),
+                        total_slps = Count('slps',distinct=True),
+                        revenue_per_clinic = Coalesce(
+                            Sum(
+                                "user_profiles__user__payments__amount",
+                                filter=Q(user_profiles__user__payments__payment_status="Paid"),
+                                output_field=FloatField(),
+                            ),
+                            Value(0.0, output_field=FloatField()),
+                        )
+                    ).values("clinic_name","clinic_id","total_users","total_slps","revenue_per_clinic")            
+                    
+                return Response({query_result},status=status.HTTP_200_OK)
+            except Exception as e:
+                return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+
+#get_clinic_revenue_details
+class ClinicRevenue(APIView):
+    def post(self,request):
+        try:
+            time_filter = request.GET.get('time_filter')  # Get time filter from request
+            date_filter = get_date_filter(time_filter)
+            clinic_revenue = Clinics.objects.annotate(
+                revenue=Coalesce(
+                    Sum(
+                        'user_profiles__user__payments__amount',
+                        filter=Q(user_profiles__user__payments__payment_date__gte=date_filter) & Q(user_profiles__user__payments__payment_status='Paid'),
+                        output_field=FloatField()
+                    ), Value(0.0, output_field=FloatField())
+                )
+            ).values('revenue',"clinic_id","clinic_name")
+            return Response({clinic_revenue},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+
+#/update_clinic_location_name/<int:ClinicID>
+#/get_clinic_details_popup/<int:clinic_id>
+class ClinicView(APIView):
+    def put(self,request,clinic_id):
+        try:
+            # Fetch the salesperson object
+            clinic = Clinics.objects.filter(clinic_id=clinic_id).first()
+            if not clinic:
+                return Response({'error': 'SalePerson not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Fields to update
+            updatable_fields = ["state", "country", "email", "ein_number", "phone","address"]
+
+            # Loop through provided fields and update them
+            updated = False 
+            for field in updatable_fields:
+                value = request.data.get(field, getattr(clinic, field))
+                if value is not None:  # Update only if field is provided
+                    setattr(clinic, field, value)
+                    updated = True
+
+            # Save only if any field is updated
+            if updated:
+                clinic.save()
+        
+            return Response({'message': 'Clinic updated successfully'}, status=status.HTTP_200_OK)
+            return Response({},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+    def get(self,request,clinic_id):
+        try:
+            clinic = Clinics.objects.filter(clinic_id=clinic_id)\
+                    .values("clinic_id","clinic_name","state","country","email","phone","address").first()
+
+            return Response({clinic},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+#/get_total_clinic_revenue_with_time_filter
+class AllClinicsRevenue(APIView):
+    def post(self,request):
+        try:
+           all_clinics_revenue = Payment.objects.filter(
+                payment_status='Paid',
+                user__user_profiles__user__user_type='clinic'  # Filters only clinic payments
+            ).aggregate(
+                total_revenue=Coalesce(Sum('amount', output_field=FloatField()), Value(0.0, output_field=FloatField()))
+            )
+           return Response(all_clinics_revenue,status=status.HTTP_200_OK)
+        except Exception as e:
+           return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+
+#/get_disorder_id/<int:user_id> 
+#/get_disorder_details/<int:UserID>
+class UserDisordersView(APIView):
+    def get(self,request,user_id):
+        try:
+            # Fetch unique DisorderIDs for the given UserID
+            disorder_ids = AssessmentResults.objects.filter(user_id=user_id).values_list("disorder_id", flat=True).distinct()
+
+            # Fetch DisorderNames for the unique DisorderIDs
+            disorders = Disorders.objects.filter(disorder_id__in=disorder_ids).values("disorder_id", "disorder_name")
+            # Format the response
+            disorder_details = [
+                {
+                    'user_id': user_id,
+                    'disorder_id': disorder["disorder_id"],
+                    'disorder_name': disorder["disorder_name"]
+                }
+                for disorder in disorders
+            ]
+            return Response(disorder_details, status=status.HTTP_200_OK)
+        except Exception as e:
+           return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+
+#/get_next_appointments/<int:UserID>
+#need to check at SlpAppointments.appointment_date received a naive datetime ,slp start time in datetimefield not timefield need to ask them and modity model and change filter
+class UserNextAppointment(APIView):
+    def get(self,request,user_id):
+        try:
+            today = date.today()
+
+            # Fetch upcoming clinic appointments
+            clinic_appointments = ClinicAppointments.objects.filter(
+                user_id=user_id, appointment_date__gte=today
+            ).values(
+                "session_type", "appointment_start", "appointment_end", "appointment_date"
+            ).annotate(appointment_source=Value("Clinic"))
+
+            # Fetch upcoming SLP appointments
+            slp_appointments = SlpAppointments.objects.filter(
+                user_id=user_id, appointment_date__gte=today
+            ).values(
+                "session_type", "start_time", "end_time", "appointment_date"
+            ).annotate(appointment_source=Value("SLP"))
+
+            # Combine both queryset results
+            all_appointments = list(chain(clinic_appointments, slp_appointments))
+
+            # Standardize field names and format response
+            formatted_appointments = [
+                {
+                    "user_id": user_id,
+                    "session_type": appt["session_type"],
+                    "start_time": appt.get("appointment_start", appt.get("start_time")),
+                    "end_time": appt.get("appointment_end", appt.get("end_time")),
+                    "appointment_date": appt["appointment_date"],
+                    "appointment_source": appt["appointment_source"],
+                }
+                for appt in all_appointments
+            ]
+
+            # Sort combined appointments by date & start time
+            formatted_appointments.sort(key=lambda x: (x["appointment_date"], x["start_time"]))
+            if not formatted_appointments:
+                return Response({'message': 'No upcoming appointments found for this UserID'}, status=status.HTTP_200_OK)
+
+            return Response(formatted_appointments, status=status.HTTP_200_OK)
+
+        except Exception as e:
+           return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)

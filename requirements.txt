@@ -40,3 +40,16 @@ tzdata
 uritemplate
 urllib3
 django-extensions
+django-debug-toolbar
+django-storages
+boto3
+python-dotenv
+pillow
+django-storages
+boto3
+zipfile36
+imagequant
+pypng
+zopfli
+docx
+whitenoise

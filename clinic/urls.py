@@ -16,9 +16,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path , include
-from .views import ClinicPatients
+from .views import ClinicPatients,DemoRequests,AssignSalePersonToDemoRequest,GetClinicsWithIdName
 urlpatterns = [
    
-   path('/get_patient_details/<int:clinic_id>' , ClinicPatients.as_view() , name="get_patient_details") 
+   path('get_patient_details/<int:clinic_id>' , ClinicPatients.as_view() , name="get_patient_details") ,
+   path('demo_requests/' , DemoRequests.as_view() , name="get_patient_details") ,
+   path('assign_salesperson/' , AssignSalePersonToDemoRequest.as_view() , name="get_patient_details") ,
+   path('get_clinics/' , GetClinicsWithIdName.as_view() , name="get_patient_details") ,
 
 ]

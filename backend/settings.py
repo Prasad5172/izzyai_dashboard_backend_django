@@ -12,6 +12,16 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+import os
+import environ
+
+env = environ.Env()
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+env_path = os.path.join(BASE_DIR, ".env")
+if os.path.exists(env_path):
+    environ.Env.read_env(env_path)
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -52,10 +62,13 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'adminer',
     'patient',
-    'django_extensions'
+    'django_extensions',
+    'debug_toolbar',
+    'storages',
 ]
 
 MIDDLEWARE = [
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -64,6 +77,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 
 ROOT_URLCONF = 'backend.urls'
@@ -132,7 +146,15 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]  # Optional if you have a 'static' folder
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+INTERNAL_IPS = [
+    "127.0.0.1",
+]
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -179,12 +201,34 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'jayanthunofficial@gmail.com'
 EMAIL_HOST_PASSWORD = 'ckicgmbnemudyvlz'
 APPEND_SLASH = False
-# # AWS_ACCESS_KEY_ID = ''
-# # AWS_SECRET_ACCESS_KEY = ''
-# # AWS_STORAGE_BUCKET_NAME = ''
-# # AWS_S3_SIGNATURE_NAME =''
-# # AWS_S3_REGION_NAME =''
-# # AWS_S3_FILE_OVERWRITE = False
-# # AWS_DEFAULT_ACL = None
-# # AWS_S3_VERIFY = True
-# # DEFAULT_FILE_STORAGE = ''
+AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_REGION_NAME =env('AWS_S3_REGION_NAME')
+AWS_S3_SIGNATURE_NAME =env('AWS_S3_SIGNATURE_NAME')
+AWS_S3_VERIFY = env.bool('AWS_S3_VERIFY', default=True)
+AWS_S3_FILE_OVERWRITE = env.bool('AWS_S3_FILE_OVERWRITE', default=False)
+AWS_DEFAULT_ACL = env('AWS_DEFAULT_ACL')
+DEFAULT_FILE_STORAGE = env('DEFAULT_FILE_STORAGE')
+#STATICFILES_STORAGE = 'storages.backends.s3boto.S3Boto3Storage' # is to upload local file 
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
+
+if DEBUG:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",  # Local media
+        },
+        "staticfiles": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",  # Local static files
+        },
+    }
+else:
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",  # AWS S3 for media
+        },
+        "staticfiles": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",  # AWS S3 for static
+        },
+    }

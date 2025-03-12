@@ -16,10 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path , include
-from .views import SalesPersonDetails,SalesPersonsFullDetails,GetSalesPersonsRevenue
+from .views import SalesPersonDetails,SalesPersonsFullDetails,GetSalesPersonsRevenue,SalesTargetView,SalesCommision
 #sales_routes in routes.txt
 urlpatterns = [
     path('get_all_salespersons_overview/',SalesPersonDetails.as_view(),name="sales_overview"),#/get_all_salespersons_overview
-    path('get_salesperson_details/<int:sale_person_id>/',SalesPersonsFullDetails.as_view(),name="get_salesperson_details"),#/get_salesperson_details_by_id/<int:sale_person_id>,/get_salesperson_details/<int:sale_person_id>
-    path('get_sales_revenue/',GetSalesPersonsRevenue.as_view(),name="update_demo_requests"), #/get_sales_revenue,/get_sales_revenue_by_id/<int:sale_person_id>
+    path('get_salesperson_details_by_id/',SalesPersonsFullDetails.as_view(),name="get_salesperson_details"),#/get_salesperson_details_by_id/<int:sale_person_id>,/get_salesperson_details/<int:sale_person_id>
+    path('insert_sales_target/',SalesTargetView.as_view(),name="get_salesperson_details"),
+    path('get_sales_commission/',SalesCommision.as_view(),name="update_demo_requests"),
+    path('get_sales_revenue/',GetSalesPersonsRevenue.as_view(),name="update_demo_requests"),
+    path('sales_target/',SalesTargetView.as_view(),name="update_demo_requests"),
 ]

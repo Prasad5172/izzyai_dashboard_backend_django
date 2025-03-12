@@ -6,7 +6,7 @@ def create_users(n):
     users = []
     for i in range(n):
         if i < 10:
-            usertype = "sale_person"
+            usertype = "sales_person"
         elif i < 20:
             usertype = "sales_director"
         elif i < 50:
@@ -77,7 +77,7 @@ def create_user_files(users):
     user_files = []
     for i in range(100):
         user_file = UserFiles.objects.create(
-            role=random.choice(["admin", "slp", "sale_person","clinic","sales_director" , "patient"]),
+            role=random.choice(["admin", "slp", "sales_person","clinic","sales_director" , "patient"]),
             file_path=fake.file_path(),
             user=users[i],
             file_name=fake.file_name(),
@@ -135,11 +135,11 @@ def create_user_excerise(n,sessions,disorders,users):
         user_exercises.append(user_exercise)
     return user_exercises
 
-def create_sale_persons(users,subscriptions):
+def create_sales_persons(users,subscriptions):
     fake: Faker = Faker()
-    sale_persons = []
+    sales_persons = []
     for i in range(10):
-        sale_person = SalePersons.objects.create(
+        sales_person = SalePersons.objects.create(
             phone=random.randint(1000000000, 9999999999),
             state=fake.state(),
             country=fake.country(),
@@ -149,8 +149,8 @@ def create_sale_persons(users,subscriptions):
             subscription_count=random.randint(1, 10),
             commission_percent=random.randint(1, 10),
         )
-        sale_persons.append(sale_person)
-    return sale_persons
+        sales_persons.append(sales_person)
+    return sales_persons
 
 def create_users_insurance(n,users):
     fake: Faker = Faker()
@@ -167,47 +167,47 @@ def create_users_insurance(n,users):
         user_insurances.append(user_insurance)
     return user_insurances
 
-def create_sales_targets(n,sale_persons):
+def create_sales_targets(n,sales_persons):
     fake: Faker = Faker()
     sales_targets = []
     for i in range(n):
         sales_target = SalesTarget.objects.create(
-            sale_person=random.choice(sale_persons),
+            sales_person=random.choice(sales_persons),
             month=random.randint(1, 12),
             year=random.randint(2010, 2020),
             target=random.randint(1000, 9999),
         )
         sales_targets.append(sales_target)
     return sales_targets
-def create_sale_person_activity_logs(n,sale_persons):
+def create_sales_person_activity_logs(n,sales_persons):
     fake: Faker = Faker()
-    sale_person_activity_logs = []
+    sales_person_activity_logs = []
     for i in range(n):
-        sale_person_activity_log = SalePersonActivityLog.objects.create(
-            sale_person=random.choice(sale_persons),
+        sales_person_activity_log = SalePersonActivityLog.objects.create(
+            sales_person=random.choice(sales_persons),
             meetings=random.randint(1, 10),
             qualifying_calls=random.randint(1, 10),
             renewal_calls=random.randint(1, 10),
             proposals_sent=random.randint(1, 10),
             date=fake.date_time_this_year(),
         )
-        sale_person_activity_logs.append(sale_person_activity_log)
-    return sale_person_activity_logs
+        sales_person_activity_logs.append(sales_person_activity_log)
+    return sales_person_activity_logs
 
-def create_sale_person_pipelines(sale_persons):
+def create_sales_person_pipelines(sales_persons):
     fake: Faker = Faker()
-    sale_person_pipelines = []
+    sales_person_pipelines = []
     for i in range(10):
-        sale_person_pipeline = SalePersonPipeline.objects.create(
-            sale_person=random.choice(sale_persons),
+        sales_person_pipeline = SalePersonPipeline.objects.create(
+            sales_person=random.choice(sales_persons),
             qualified_sales=random.randint(1, 10),
             renewals=random.randint(1, 10),
             prospective_sales=random.randint(1, 10),
             closed_sales=random.randint(1, 10),
             date=fake.date_time_this_year(),
         )
-        sale_person_pipelines.append(sale_person_pipeline)
-    return sale_person_pipelines
+        sales_person_pipelines.append(sales_person_pipeline)
+    return sales_person_pipelines
 
 def create_sales_directors(users):
     fake: Faker = Faker()
@@ -255,7 +255,7 @@ def create_assessment_results(users,sessions,disorders,n):
         assessment_results.append(assessment_result)
     return assessment_results   
 
-def create_clinics(n,users,sale_persons):
+def create_clinics(n,users,sales_persons):
     fake: Faker = Faker()
     clinics = []
     for i in range(n):
@@ -264,7 +264,7 @@ def create_clinics(n,users,sale_persons):
             state=fake.state(),
             total_patients=random.randint(100, 150),
             slp_count = random.randint(1, 10),
-            sale_person = random.choice(sale_persons),
+            sales_person = random.choice(sales_persons),
             country=fake.country(),
             user = users[i+50],
             email=fake.email(),
@@ -275,7 +275,7 @@ def create_clinics(n,users,sale_persons):
         )
         clinics.append(clinic)
     return clinics
-def create_demo_requests(n,sale_persons):
+def create_demo_requests(n,sales_persons):
     fake: Faker = Faker()
     demo_requests = []
     for i in range(n):
@@ -286,7 +286,7 @@ def create_demo_requests(n,sale_persons):
             country=fake.country(),
             comments=fake.text(),
             contact_number=random.randint(1000000000, 9999999999),
-            sales_person=sale_persons[i%10],
+            sales_person=sales_persons[i%10],
             email=fake.email(),
             patients_count  = random.randint(1, 100),
         )
@@ -333,7 +333,7 @@ def create_sales(n,clinics):
     for i in range(n):
         clinic = clinics[i%20]
         sale = Sales.objects.create(
-            sale_person=clinic.sale_person,
+            sales_person=clinic.sales_person,
             subscription_count=random.randint(1, 10),
             commission_percent=random.randint(1, 50),
             clinic=clinic,
@@ -546,18 +546,18 @@ if __name__ == "__main__":
     usser_excerises = create_user_excerise(100,sessions,disorders,users)
     user_insurances = create_users_insurance(100,users)
     #user 1 -10 sale person
-    sale_persons = create_sale_persons(users,subscriptions)
-    sales_targets = create_sales_targets(10,sale_persons)
-    sale_person_activity_logs = create_sale_person_activity_logs(10,sale_persons)
-    sale_person_pipelines = create_sale_person_pipelines(sale_persons)
+    sales_persons = create_sales_persons(users,subscriptions)
+    sales_targets = create_sales_targets(10,sales_persons)
+    sales_person_activity_logs = create_sales_person_activity_logs(10,sales_persons)
+    sales_person_pipelines = create_sales_person_pipelines(sales_persons)
     # 11 - 20 sales director
     sales_director = create_sales_directors(users)
     # 21-50 patients
     patient_files = create_patient_files(users,20,50)
     assessment_results = create_assessment_results(users,sessions,disorders,150)
-    demo_requests = create_demo_requests(20,sale_persons)
+    demo_requests = create_demo_requests(20,sales_persons)
     # 51-70 clinics
-    clinics = create_clinics(20,users,sale_persons)
+    clinics = create_clinics(20,users,sales_persons)
     # 81-90 slp
     slps = create_slps(10,users,clinics)
     slp_appointments = create_slp_appoinments(30,users,slps,disorders)

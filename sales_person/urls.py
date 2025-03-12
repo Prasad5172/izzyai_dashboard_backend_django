@@ -16,13 +16,19 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path , include
-from .views import  SalespersonPipelineProgress,GenerateDemoCredentials,SendClinicRegistredLinkAfterDemo,ActivityLog
+from .views import  GenerateDemoCredentials,SendClinicRegistredLinkAfterDemo,ActivityLog,SalesPersonView,UpdateSalesPersonProfile,GetSalesPersonsIdsNames,PipeLineProgress,GetMonthlyRegistrationsPatientsClinics,GetClinicRevenueBySalesPerson,GetWeeklyMonthlyQuaterlySalesBySalesPerson,GetSalesBySalesPerson
 urlpatterns = [
-   path('salesperson-pipeline-progress' , SalespersonPipelineProgress.as_view() , name="salesperson-pipeline-progress"),
-   path('generate-demo-credentials/' , GenerateDemoCredentials.as_view() , name="generate-demo-credentials"), #/generate_demo_credentials
-   path('clinic-register-link/' , SendClinicRegistredLinkAfterDemo.as_view() , name="send-registred-link"),#/clinic_register_link
-   path('get_activity_log/' , ActivityLog.as_view() , name="send-registred-link"), #get_activity_log/
-   path('insert-pipeline-progress/' , ActivityLog.as_view() , name="send-registred-link"), #insert_pipeline_progress
+   path('generate_demo_credentials/' , GenerateDemoCredentials.as_view() , name="generate-demo-credentials"),
+   path('get_salesperson_details/' , SalesPersonView.as_view() , name="send-registred-link"),
+   path('update_profile_sales_person/' , UpdateSalesPersonProfile.as_view() , name="send-registred-link"),
+   path('salespersons_ids/' , GetSalesPersonsIdsNames.as_view() , name="send-registred-link"),
+   path('clinic_register_link/' , SendClinicRegistredLinkAfterDemo.as_view() , name="send-registred-link"),
+   path('activity_log/' , ActivityLog.as_view() , name="send-registred-link"),
+   path('pipeline_progress/' , PipeLineProgress.as_view() , name="send-registred-link"),
+   path('get_monthly_registrations/' , GetMonthlyRegistrationsPatientsClinics.as_view() , name="send-registred-link"),
+   path('get_clinic_revenue_by_saleperson/' , GetClinicRevenueBySalesPerson.as_view() , name="send-registred-link"),
+   path('track_sales_by_saleperson_graph/' , GetWeeklyMonthlyQuaterlySalesBySalesPerson.as_view() , name="send-registred-link"),
+   path('track_sales_by_saleperson/' , GetSalesBySalesPerson.as_view() , name="send-registred-link"),
 
    
 

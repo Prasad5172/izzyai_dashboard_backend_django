@@ -1,13 +1,13 @@
 from django.core.mail import EmailMessage
 from django.conf import settings
 
-def send_clinic_signup_link_email(recipient_email, sale_person_id, signup_link):
+def send_clinic_signup_link_email(recipient_email, sales_person_id, signup_link):
     try:
         subject = "Welcome to IzzyAI - Complete Your Registration"
         message_body = f"""\
         Dear User,
 
-        Welcome to IzzyAI! A sales representative (ID: {sale_person_id}) has referred you to our platform. To complete your registration, please click the following link:
+        Welcome to IzzyAI! A sales representative (ID: {sales_person_id}) has referred you to our platform. To complete your registration, please click the following link:
 
         Sign-up Link: {signup_link}
 

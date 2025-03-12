@@ -205,12 +205,6 @@ class PatientAssessment(APIView):
                     return JsonResponse(response_data, safe=False)
             else:
                 return JsonResponse({"message": "No data found for the given UserID and DisorderID"}, status=404)
-    
-        except ObjectDoesNotExist:
-            return JsonResponse({"error": "User or Disorder not found"}, status=404)
-        except json.JSONDecodeError:
-            return JsonResponse({"error": "Invalid JSON format in emotion data"}, status=400)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
-
 

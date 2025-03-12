@@ -5,8 +5,8 @@ from .models import (
 
 @admin.register(Sales)
 class SalesAdmin(admin.ModelAdmin):
-    list_display = ('sales_id', 'sale_person_id', 'subscription_count', 'commission_percent', 'clinic_id', 'payment_status', 'subscription_type')
-    search_fields = ('sales_id', 'sale_person_id')
+    list_display = ('sales_id', 'sales_person_id', 'subscription_count', 'commission_percent', 'clinic_id', 'payment_status', 'subscription_type')
+    search_fields = ('sales_id', 'sales_person_id')
     list_filter = ('payment_status', 'subscription_type')
 
 

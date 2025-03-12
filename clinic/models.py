@@ -8,10 +8,8 @@ class Clinics(models.Model):
     state = models.CharField(max_length=255)
     total_patients = models.BigIntegerField(default=0)
     slp_count = models.BigIntegerField(default=0)
-    #sale_person_id = models.BigIntegerField(null=True, blank=True) # need to add mapping to sales person
-    sale_person = models.ForeignKey('sales_person.SalePersons', on_delete=models.CASCADE,related_name='clinics')
+    sales_person = models.ForeignKey('sales_person.SalePersons', on_delete=models.CASCADE,related_name='clinics')
     country = models.CharField(max_length=255)
-    #UserId = models.BigIntegerField(null=True, blank=True)
     user = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE,related_name='clinics')
     email = models.EmailField(unique=True)
     ein_number = models.BigIntegerField(unique=True)
@@ -118,17 +116,19 @@ class DemoRequested(models.Model):
     def __str__(self):
         return self.first_name
 
+def patient_file_upload_path(instance, filename):
+    return f'uploads/{instance.role}/{instance.user.user_id}/{filename}'
+
 class PatientFiles(models.Model):
     file_id = models.BigAutoField(primary_key=True)
     file_name = models.CharField(max_length=255)
-    document_type = models.CharField(max_length=255)
-    diagnosis_name = models.CharField(max_length=255)
-    upload_timestamp = models.DateTimeField(null=False, blank=False)
-    #user_id = models.BigIntegerField(null=False,blank=False)
+    diagnosis_name = models.CharField(max_length=255,null=True,blank=True)
+    upload_timestamp = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey('authentication.CustomUser', on_delete=models.CASCADE,related_name="patient_files")
+    file_url = models.TextField(max_length=255)
     file_path = models.TextField(max_length=255)
     role = models.CharField(max_length=255)
-
+    content_type = models.CharField(max_length=255)#type of document
     def __str__(self):
         return self.file_name
 

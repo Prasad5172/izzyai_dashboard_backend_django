@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.db.models import Count, Sum, F, Q,FloatField,Value,Case,When,ExpressionWrapper
+from django.db.models import Count, Sum, F, Q,FloatField,Value,Case,When,ExpressionWrapper,Prefetch
 from django.db.models.functions import Coalesce, Round
 from datetime import timedelta
 from django.utils.timezone import now
@@ -11,85 +11,99 @@ from authentication.models import CustomUser,UserProfile
 from payment.models import Payment
 from sales_person.models import SalesTarget
 from clinic.models import Clinics,DemoRequested
+from .models import Sales,SalesDirector
 
-def activeClinicsForSalesPerson(sale_person_id):
-    return Clinics.objects.filter(sale_person_id=sale_person_id)
+def activeClinicsForSalesPerson(sales_person_id):
+    return Clinics.objects.filter(sales_person_id=sales_person_id)
 
 # Create your views here.
 #/get_all_salespersons_overview
 #query verified
 class SalesPersonDetails(APIView):
-    def get_all_salespersons_overview(request):
-        """
-        Fetches an overview of all salespersons, including clinic count, user count, sales per clinic, and revenue.
-        """
+    def get(self, request):
         try:
-            salespersons = SalePersons.objects.annotate(
+            # Step 1: Optimized Sales Data Query
+            salespersons = SalePersons.objects.select_related('user').prefetch_related(
+                Prefetch(
+                    'clinics__user_profiles__user__payments',
+                    queryset=Payment.objects.filter(payment_status='Paid').only('amount')
+                )
+            ).alias(
                 active_clinics_count=Count("clinics", distinct=True),
-                total_revenue=Coalesce(Sum(
+                total_revenue=Coalesce(
+                    Sum(
                         "clinics__user_profiles__user__payments__amount",
                         filter=Q(clinics__user_profiles__user__payments__payment_status="Paid")
-                    ),Value(0.0, output_field=FloatField())),
-                total_users=Count("clinics__user_profiles", distinct=True),
+                    ),
+                    Value(0.0, output_field=FloatField())
+                ),
+                total_users=Count("clinics__user_profiles", distinct=True)
+            ).annotate(
+                sales_per_clinic=Case(
+                    When(
+                        active_clinics_count__gt=0,
+                        then=ExpressionWrapper(
+                            F("total_users") / F("active_clinics_count"),
+                            output_field=FloatField()
+                        )
+                    ),
+                    default=Value(0),
+                    output_field=FloatField()
+                ),
+                name=F("user__username"),
+                active_clinics=F("active_clinics_count"),
+                revenue_generated=F("total_revenue"),
+                total_users = F("total_users")
+            ).values(
+                "sales_person_id",
+                "country",
+                "name",
+                "active_clinics",
+                "sales_per_clinic",
+                "revenue_generated",
+                "total_users"
+            )
+
+            # Step 2: Optimized Commission Data Query
+            commission_data = SalePersons.objects.annotate(
                 commission_amount=Coalesce(
-                                    Sum(
-                                        F('sales__subscription_count') * Value(50.0, output_field=FloatField()) *
-                                        (F('sales__commission_percent') / 100.0),
-                                        distinct=True,
-                                        output_field=FloatField()
-                                    ),
-                                    Value(0.0, output_field=FloatField())
-                )
-                ).annotate(
-                    sales_per_clinic=Case(
-                        When(
-                            active_clinics_count__gt=0,
-                            then=ExpressionWrapper(
-                                F("total_users") / F("active_clinics_count"),
-                                output_field=FloatField()
-                            )
-                        ),
-                        default=Value(0),
+                    Sum(
+                        F('sales__subscription_count') * Value(50.0, output_field=FloatField()) *
+                        (F('sales__commission_percent') / 100.0),
+                        distinct=True,
                         output_field=FloatField()
                     ),
-                    name=F("user__username"),
-                    SalePersonId=F("sale_person_id"),
-                    ActiveClinics=F("active_clinics_count"),
-                    SalesPerClinic=F("sales_per_clinic"),
-                    RevenueGenerated=F("total_revenue"),
-                ).values(
-                    "SalePersonId",
-                    "country",
-                    "name",
-                    "ActiveClinics",
-                    "SalesPerClinic",
-                    "RevenueGenerated",
-                    "total_users",
-                    "commission_amount"
+                    Value(0.0, output_field=FloatField())
                 )
-            result = list(salespersons)
-            return Response({result:result},status=status.HTTP_200_OK)
+            ).values("sales_person_id", "commission_amount")
+
+            # Step 3: Combine Results
+            sales_dict = {item['sales_person_id']: item for item in salespersons}
+            for commission in commission_data:
+                sales_id = commission['sales_person_id']
+                if sales_id in sales_dict:
+                    sales_dict[sales_id]['commission_amount'] = commission['commission_amount']
+
+            # Step 4: Final Result
+            result = list(sales_dict.values())
+            return Response(result, status=status.HTTP_200_OK)
+
         except Exception as e:
-            return Response({"error": f"Error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)   
+            return Response({"error": f"Error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 #/get_sales_target,/insert_sales_target
-class SalesTarget(APIView):
-    def post(request):
-        """
-        Endpoint to insert a sales target for a salesperson.
-
-        This endpoint allows inserting a sales target for a specific salesperson, 
-        identified by SalePersonID, for a given month and year.
-        """
-        sale_person_id = request.data.get('SalePersonID')
-        month = request.data.get('Month')
-        year = request.data.get('Year')
-        target = request.data.get('Target')
+class SalesTargetView(APIView):
+    def post(self,request):
+        sales_person_id = request.data.get('sales_person_id')
+        month = request.data.get('month')
+        year = request.data.get('year')
+        target = request.data.get('target')
 
         month_mapping = {
-            'January': 1, 'February': 2, 'March': 3, 'April': 4,
-            'May': 5, 'June': 6, 'July': 7, 'August': 8,
-            'September': 9, 'October': 10, 'November': 11, 'December': 12
+            'january': 1, 'february': 2, 'march': 3, 'april': 4,
+            'may': 5, 'june': 6, 'july': 7, 'august': 8,
+            'september': 9, 'october': 10, 'november': 11, 'december': 12
         }
 
         month_int = month_mapping.get(month)
@@ -98,7 +112,7 @@ class SalesTarget(APIView):
 
         try:
             SalesTarget.objects.create(
-                sale_person_id=sale_person_id,
+                sales_person_id=sales_person_id,
                 month=month_int,
                 year=year,
                 target=target
@@ -107,67 +121,109 @@ class SalesTarget(APIView):
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-    def get(self,request):
+    def get(self, request):
         try:
-            sale_person_id = request.GET.get('SalePersonID')
-            sales_target = SalesTarget.objects.filter(sale_person_id=sale_person_id).first()
+            sales_person_id = request.GET.get('sales_person_id')
+            
+            # Check if sales_person_id is provided
+            if not sales_person_id:
+                return Response({'error': 'Missing SalePersonID'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Filter and order results
+            sales_targets = (
+                SalesTarget.objects
+                .filter(sales_person_id=sales_person_id)
+                .values('month', 'year', 'target')
+                .order_by('year', 'month')
+            )
+
+            # If no sales targets are found
+            if not sales_targets.exists():
+                return Response({'message': 'No sales targets found for the given SalePersonID'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Format the response
             return Response({
-                'SalePersonID': sale_person_id,
-                'Month': sales_target.month,
-                'Year': sales_target.year,
-                'Target': sales_target.target
-            },status=status.HTTP_201_CREATED)
+                'sales_person_id': sales_person_id,
+                'sales_targets': list(sales_targets)
+            }, status=status.HTTP_200_OK)
+
         except Exception as e:
-            return Response({'error': f'Error occurred: {str(e)}'} , status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         
-#/get_salesperson_details,/get_salesperson_details_by_id
+#/get_salesperson_details_by_id/<int:sale_person_id>
 class SalesPersonsFullDetails(APIView):
-    def get(self , request , sale_person_id ):
+    def get(self, request):
         try:
-            # Fetch SalesPerson details including subscription count
-            salesperson = SalePersons.objects.filter(sale_person_id=sale_person_id).annotate(
-                active_clinics=Count("clinics"),
-                total_revenue=Sum("clinics__user_profiles__user__payments__amount", 
-                                filter=Q(clinics__user_profiles__user__payments__payment_status="Paid")),
-                total_users=Count("clinics__user_profiles__user", distinct=True)  # Count unique users across clinics
-                ).values(
-                    "user__username", "country", "state", "subscription_count",
-                    "commission_percent", "user__email", "phone", "user_id",
-                    "active_clinics", "total_revenue", "total_users"
-                ).first()
+            sales_person_id = request.GET.get("sales_person_id")
 
-            if not salesperson:
-                print({"error": "Salesperson not found"})
-            else:
-                clinics = Clinics.objects.filter(sale_person_id=sale_person_id).values_list("clinic_name", flat=True)
-                active_clinic_names = list(clinics)
+            # Step 1: Optimized SalesPerson Data
+            salesperson = (
+                SalePersons.objects
+                .select_related('user')  # Efficient ForeignKey join
+                .annotate(
+                    active_clinics=Count('clinics', distinct=True),
+                    total_users=Count('clinics__user_profiles__user', distinct=True)
+                )
+                .only(
+                    'user__username', 'user__email', 'country', 'state',
+                    'phone', 'commission_percent', 'subscription_count'
+                )
+                .get(sales_person_id=sales_person_id)
+            )
 
-                # Avoid division by zero
-                sales_per_clinic = -(-salesperson["total_users"] // salesperson["active_clinics"]) if salesperson["active_clinics"] > 0 else 0
+            # Step 2: Optimized Revenue Calculation (Separate Query for Efficiency)
+            total_revenue = (
+                Payment.objects
+                .filter(
+                    user__user_profiles__clinic__sales_person_id=sales_person_id,
+                    payment_status='Paid'
+                )
+                .aggregate(total_revenue=Coalesce(Sum('amount'), Value(0.0)))['total_revenue']
+            )
 
-                # Prepare the result
-                result = {
-                    'SalePersonID': sale_person_id,
-                    'Name': salesperson['user__username'],
-                    'Email': salesperson['user__email'],
-                    'Country': salesperson['country'],
-                    'State': salesperson['state'],
-                    'Phone': salesperson['phone'],
-                    'CommissionPercent': salesperson['commission_percent'],
-                    'SubscriptionCount': salesperson['subscription_count'],
-                    'ActiveClinics': salesperson['active_clinics'],
-                    'ActiveClinicNames': active_clinic_names,
-                    'SalesPerClinic': sales_per_clinic,
-                    'RevenueGenerated': salesperson['total_revenue'] or 0
-                }
+            # Step 3: Optimized Clinics Fetch in Chunks (Using Chunking for Scalability)
+            active_clinic_names = list(
+                Clinics.objects
+                .filter(sales_person_id=sales_person_id)
+                .only('clinic_name')
+                .values_list("clinic_name", flat=True)
+            )
+
+            # Step 4: Sales Per Clinic Calculation
+            sales_per_clinic = (
+                -(-salesperson.total_users // salesperson.active_clinics)
+                if salesperson.active_clinics > 0 else 0
+            )
+
+            # Step 5: Final Data Preparation
+            result = {
+                'sales_person_id': sales_person_id,
+                'name': salesperson.user.username,
+                'email': salesperson.user.email,
+                'country': salesperson.country,
+                'state': salesperson.state,
+                'phone': salesperson.phone,
+                'commission_percent': salesperson.commission_percent,
+                'subscription_count': salesperson.subscription_count,
+                'active_clinics': salesperson.active_clinics,
+                'active_clinic_names': active_clinic_names,
+                'sales_per_clinic': sales_per_clinic,
+                'revenue_generated': total_revenue
+            }
+
             return Response(result, status=200)
+
+        except SalePersons.DoesNotExist:
+            return Response({'error': 'Salesperson not found'}, status=404)
+        
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'}, status=500)
 
 #/get_sales_commission,
 #in middle
 class SalesCommision(APIView):
-    def get(self , request , sale_person_id ):
+    def get(self , request ):
         try:
             time_filter = request.GET.get('time_filter', None)
 
@@ -189,89 +245,60 @@ class SalesCommision(APIView):
                         F('revenue_generated') * (F('commission_percent') / 100.0),
                         2
                     )
-                ).values('sale_person_id', 'user__username', 'revenue_generated', 'commission_per_salesperson')
+                ).values('sales_person_id', 'user__username', 'revenue_generated', 'commission_per_salesperson')
              # Convert to JSON response
              
             results = []
             for row in sales_commission_details:
                 results.append({
-                    'SalePersonID': row["sale_person_id"],
-                    'Name': row["user__username"],
-                    'RevenueGenerated': row["revenue_generated"],
-                    'CommissionPerSalePerson': row["commission_per_salesperson"]
+                    'sales_person_id': row["sales_person_id"],
+                    'name': row["user__username"],
+                    'revenue_generated': row["revenue_generated"],
+                    'commission_per_salesperson': row["commission_per_salesperson"]
                 })
-            return Response(list(results), safe=False)
+            return Response(results, status=200)
 
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'}, status=500)
 
 
-#pass saleperson_id for salesperson revenue else it fetches all persons revenue.
-
-class AssignSalesPersonToDemoRequest(APIView):
-    def put(self, request, demo_request_id):
-        try:
-            # Fetch the demo request object
-            demo_request = DemoRequested.objects.filter(demo_request_id=demo_request_id).first()
-            if not demo_request:
-                return Response({'error': 'Demo Request not found'}, status=status.HTTP_404_NOT_FOUND)
-
-            # Fields to update
-            updatable_fields = ["sale_person_id"]
-
-            # Track if any updates were made
-            updated = False
-
-            # Loop through provided fields and update them
-            for field in updatable_fields:
-                value = request.data.get(field)
-                if value is not None:
-                    setattr(demo_request, field, value)
-                    updated = True  # Mark as updated
-
-            # Save only if any field is updated
-            if updated:
-                demo_request.save()
-                return Response({'message': 'Demo Request updated successfully'}, status=status.HTTP_200_OK)
-            else:
-                return Response({'message': 'No changes were made'}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 #/get_sales_revenue,/get_sales_revenue_by_id/<int:sale_person_id>
 class GetSalesPersonsRevenue(APIView):
     def get(self , request ):
         try:
-            saleperson_id = int(request.GET.get('sales_person_id', None))
+            sales_person_id = request.GET.get('sales_person_id', None)
             time_filter = request.GET.get('time_filter', None) 
-            date_filter = now()-timedelta(days=365)
+            date_filter = None
             if time_filter == 'last_month':
                 date_filter = now() - timedelta(days=30)
+                print("last_month")
             elif time_filter == 'annual':
                 date_filter = now() - timedelta(days=365)
-
-            if(saleperson_id is not None):
+            
+            if(sales_person_id is not None):
                 #fetch sales persons revenue
-                salesperson = SalePersons.objects.filter(sale_person_id=saleperson_id).annotate(
-                        total_revenue=Coalesce(Sum("clinics__user_profiles__user__payments__amount",
+                salesperson = SalePersons.objects.filter(sales_person_id=sales_person_id).annotate(
+                        total_revenue=Coalesce(
+                            Sum("clinics__user_profiles__user__payments__amount",
                                         filter=Q(clinics__user_profiles__user__payments__payment_date__gte=date_filter) & Q(clinics__user_profiles__user__payments__payment_status="Paid")),
                                         Value(0.0, output_field=FloatField())),
                         ).values(
-                            "sale_person_id", "country", "state", "total_revenue"
+                            "sales_person_id", "country", "state", "total_revenue"
                         ).first()
                 return Response(
                     {
-                        'SalePersonID': salesperson.sale_person_id,
-                        'Country': salesperson.country,
-                        'State': salesperson.state,
-                        'RevenueGenerated': salesperson.total_revenue
+                        'sales_person_id': salesperson['sales_person_id'],
+                        'country': salesperson['country'],
+                        'state': salesperson['state'],
+                        'revenue_generated': salesperson['total_revenue']
                         }, status=status.HTTP_200_OK)
             salesperson = SalePersons.objects.annotate(
-                total_revenue=Coalesce(Sum("clinics__user_profiles__user__payments__amount",
-                                filter=Q(clinics__user_profiles__user__payments__payment_status="Paid")),
+                total_revenue=Coalesce(
+                    Sum("clinics__user_profiles__user__payments__amount",
+                                filter=Q(clinics__user_profiles__user__payments__payment_date__gte=date_filter) & Q(clinics__user_profiles__user__payments__payment_status="Paid")),
                                 Value(0.0, output_field=FloatField())),
                 ).values(
-                    "sale_person_id", "country", "state", "total_revenue"
+                    "sales_person_id", "country", "state", "total_revenue"
                 )
             return Response({"salespersonrevenue": salesperson}, status=status.HTTP_200_OK)
         except Exception as e:
@@ -300,3 +327,26 @@ class AssignSalesPersonToDemoRequest(APIView):
                 return Response({'message': 'No changes were made'}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+#/create_sales
+class SalesView(APIView):
+    def post(self,request):
+        try:
+            sales_person_id = request.data.get('sales_person_id')
+            subscription_count = request.data.get('subscription_count')
+            commission_percent = request.data.get('commission_percent')
+            subscription_type = request.data.get('subscription_type')  # Replacing SubscriptionID with SubscriptionType
+            clinic_id = request.data.get('clinic_id')  # Adding ClinicID
+            payment_status = request.data.get('payment_status', 'Unpaid')
+
+            Sales.objects.create(
+                sales_person_id=sales_person_id,
+                subscription_count=subscription_count,
+                commission_percent=commission_percent,
+                subscription_type=subscription_type,
+                payment_status = payment_status,
+                clinic_id=clinic_id
+            )
+            return Response({'message': 'Sales record created successfully.'},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)

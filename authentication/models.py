@@ -38,7 +38,7 @@ class CustomUser(AbstractUser):
     user_type = models.CharField(max_length=255)
     created_account = models.DateTimeField(auto_now_add=True)
     username = models.CharField(unique=True,max_length=255)
-    expiration_date = models.DateTimeField(null=True, blank=True) # this is for demo request users
+    expiration_date = models.DateTimeField(null=True, blank=True), # this is for demo request users
     groups = models.ManyToManyField(
         "auth.Group",
         related_name="customuser_groups",

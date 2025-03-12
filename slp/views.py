@@ -15,7 +15,7 @@ import json
 from slp.models import Slps,SlpAppointments
 from authentication.models import UserProfile , CustomUser,UserExercises
 from rest_framework.permissions import IsAuthenticated
-from clinic.models import Clinics , ClinicAppointments , Tasks , TherapyData,TreatmentData,Disorders,Sessions
+from clinic.models import Clinics , ClinicAppointments , Tasks , TherapyData,TreatmentData,Disorders,Sessions,AssessmentResults
 from django.shortcuts import get_object_or_404
 from datetime import datetime
 from slp.models import Slps
@@ -79,7 +79,7 @@ class Slp(APIView):
     def put(self, request, SlpID):
         try:
             # Fetch the salesperson object
-            salesperson = Slps.objects.filter(sale_person_id=SlpID).first()
+            salesperson = Slps.objects.filter(sales_person_id=SlpID).first()
             if not salesperson:
                 return Response({'error': 'SalePerson not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -117,12 +117,13 @@ class CompletedPatients(APIView):
 #/get_patients_by_slp/<int:slp_id>
 #/update_patient_details/<int:UserID>
 #/get_users_by_slp/<int:SlpID>
+#/get_user_info_by_slp/<int:slp_id>(management route)
 class Patients(APIView):
     def get(self , request , slp_id ):
         try:
             patients = UserProfile.objects.filter(
                 slp_id=slp_id
-            ).values_list("user_id","full_name","age")
+            ).values_list("user_id","full_name","age","dob","user__email")
             return Response(patients, status=status.HTTP_200_OK)
         except Slps.DoesNotExist:
             return Response({"message": "No users found for the given SlpID"}, status=status.HTTP_404_NOT_FOUND)
@@ -634,6 +635,33 @@ class SLPPatinetAttendance(APIView):
         except Exception as e:
             return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
 
+#/get_slp_profile/<int:UserID>
+class GetSlpByUserIdView(APIView):
+    def get(self,request,user_id):
+        try:
+           # Fetch SLP details directly using select_related
+            user_profile = UserProfile.objects.filter(user_id=user_id).select_related("slp") \
+                .values("slp_id", "slp__slp_name", "slp__phone", "slp__email", "slp__country", "slp__state", "slp__clinic__clinic_name") \
+                .first()
+
+            if not user_profile or not user_profile["slp_id"]:
+                return Response({'message': 'No SLP assigned to this UserID'}, status=404)
+
+            # Construct SLP details response
+            slp_details = {
+                'slp_id': user_profile["slp_id"],
+                'slp_name': user_profile["slp__slp_name"],
+                'phone': user_profile["slp__phone"],
+                'email': user_profile["slp__email"],
+                'country': user_profile["slp__country"],
+                'state': user_profile["slp__state"],
+                'clinic_name': user_profile["slp__clinic__clinic_name"] or "No Clinic Assigned"
+            }
+            return Response({slp_details},status=status.HTTP_200_OK)
+        except Exception as e:
+           return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+
+
 def get_excerise_articulation(user_exercises,session_order):
     response_data = []
 
@@ -779,7 +807,7 @@ def get_excerise_receptive(user_exercises,session_order):
 #/get_exercise_stammering/<int:user_id>/<int:disorder_id>
 #/get_exercise_voice/<int:user_id>/<int:disorder_id>
 #/get_exercise_expressive/<int:user_id>/<int:disorder_id>
-class GetExcerise(APIView):
+class GetExceriseResults(APIView):
     def get(self,request,user_id,disorder_id):
         try:
             # Step 1: Fetch Sessions for the user
@@ -821,3 +849,206 @@ class GetExcerise(APIView):
             return Response({response_data},status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
+
+def get_assessment_articulation(user_assessments,session_order):
+    response_data = []
+
+    for assessment in user_assessments:
+        session_id = assessment["session_id"]
+        emotion_data =  json.loads(assessment["emotion"]) if assessment["emotion"] else {}
+        score = assessment["score"]
+        date = assessment["assessment_date"]
+
+        if emotion_data is not None:
+            if isinstance(emotion_data, str):
+                emotion_data = json.loads(emotion_data) 
+        
+            expressions = emotion_data.get("expressions", [])
+            incorrect = emotion_data.get("incorrect", 0)
+            questions_array = emotion_data.get("questions_array", [])
+            
+            word_texts = [question["WordText"] for question in questions_array]
+
+            response_data.append({
+                "SessionNo": session_order.get(session_id),
+                "facial_expressions": expressions,
+                "expressions_incorrect": incorrect,
+                "Incorrect_pronunciations": word_texts,
+                "Score": score,
+                "Date": date
+            })
+    return response_data
+def get_assessment_stammering(user_assessments,session_order):
+    response_data = []
+
+    for assessment in user_assessments:
+        session_id = assessment["session_id"]
+        emotion_data =  json.loads(assessment["emotion"]) if assessment["emotion"] else {None}
+        score = assessment["score"]
+        date = assessment["assessment_date"]
+
+        # Ensure emotion_data is either None or an empty dictionary
+        emotion_data = json.loads(assessment["emotion"]) if assessment["emotion"] else {}
+
+        if emotion_data:  # Ensure emotion_data is not None or empty before processing
+            if isinstance(emotion_data, str):
+                emotion_data = json.loads(emotion_data)
+
+            expressions = emotion_data.get("expressions", [])
+            incorrect = emotion_data.get("incorrect", 0)
+            correct = emotion_data.get("correct", 0)
+            questions_array = emotion_data.get("questions_array", [])
+
+            #word_texts = [question["question_text"] for question in questions_array]
+            response_data.append({
+                "Number of Session": session_order.get(session_id),
+                "facial Expression": expressions,
+                "Incorrect Facial Expression": incorrect,
+                "Stammering": score,
+                "Date": date
+            })
+        else:
+            # If emotion_data is empty, append default values
+            response_data.append({
+                "Number of Session": session_order.get(session_id),
+                "facial Expression": [],
+                "Incorrect Facial Expression": 0,
+                "Stammering": score,
+                "Date": date
+            })
+
+    return response_data
+def get_assessment_voice(user_assessments,session_order):
+    response_data = []
+
+    for assessment in user_assessments:
+        session_id = assessment["session_id"]
+        emotion_data =  json.loads(assessment["emotion"]) if assessment["emotion"] else {}
+        score = assessment["score"]
+        date = assessment["assessment_date"]
+        
+        expressions = emotion_data.get("expressions", [])
+        correct = emotion_data.get("correct", 0)
+        incorrect = emotion_data.get("incorrect", 0)
+        questions_array = emotion_data.get("questions_array", [])
+        
+        questions_with_voice_disorder = [
+                    {
+                        "wordtext": question["wordtext"],
+                        "Voice-Disorder": question.get("Voice-Disorder", "0.0%")  # Default to "0.0%" if missing
+                    }
+                    for question in questions_array
+                ]
+        response_data.append({
+            "Number of Session": session_order.get(session_id),  # Session order from get_report API
+            "facial Expression": expressions,
+            "Incorrect Facial Expression": incorrect,
+            "Questions with Voice Disorder": questions_with_voice_disorder,
+            "Voice Disorder Score": score  ,# Include the Score in the response
+            "Date":date
+        })
+    return response_data
+def get_assessment_expressive(user_assessments,session_order):
+    response_data = []
+    for assessment in user_assessments:
+        session_id = assessment["session_id"]
+        emotion_data =  json.loads(assessment["emotion"]) if assessment["emotion"] else {}
+        score = assessment["score"]
+        date = assessment["assessment_date"]
+        
+        expressions = emotion_data.get("expressions", [])
+        correct = emotion_data.get("correct", 0)
+        incorrect = emotion_data.get("incorrect", 0)
+        questions_array = emotion_data.get("questions_array", [])
+        
+        word_texts = []
+        for question in questions_array:
+            question_text = question["questiontext"]
+            # Stop at the first question mark and clean the question text
+            cleaned_text = re.sub(r'\?.*$', '?', question_text)  
+            cleaned_text = cleaned_text.strip()  
+
+            # Add the cleaned question only if it's not already in the list
+            if cleaned_text not in word_texts:
+                word_texts.append(cleaned_text)
+
+        # Remove duplicates if any
+        word_texts = list(set(word_texts))  
+
+        # Append this row's data to the response list
+        response_data.append({
+            "Number of Session": session_order.get(session_id),  
+            "facial Expression": expressions,
+            "Incorrect Facial Expression": incorrect,
+            "Incorrect Questions": word_texts,  
+            "Expressive Language Disorder": score, 
+            "Date":date
+        })
+    return response_data
+def get_assessment_receptive(user_assessments,session_order):
+    response_data = []
+
+    for assessment in user_assessments:
+        session_id = assessment["session_id"]
+        emotion_data =  json.loads(assessment["emotion"]) if assessment["emotion"] else {}
+        score = assessment["score"]
+        date = assessment["assessment_date"]
+        
+        expressions = emotion_data.get("expressions", [])
+        correct = emotion_data.get("correct", 0)
+        incorrect = emotion_data.get("incorrect", 0)
+        questions_array = emotion_data.get("questions_array", [])
+        
+        word_texts = [question["question_text"] for question in questions_array]
+
+        response_data.append({
+            "Number of Session": session_order.get(session_id),  # Session order from get_report API
+            "Incorrect Questions": word_texts,
+            "Receptive Language Disorder": score , # Include the Score in the response
+            "Date":date
+        })
+    return response_data
+
+#/get_assessment_articulation/<int:user_id>/<int:disorder_id>
+#/get_assessment_receptive/<int:user_id>/<int:disorder_id>
+#/get_assessment_stammering/<int:user_id>/<int:disorder_id>
+#/get_assessment_voice/<int:user_id>/<int:disorder_id>
+#/get_assessment_expressive/<int:user_id>/<int:disorder_id>
+# need to check the emotion data while converting to json in the assessment fucntions 
+class GetAssessmentResultsView(APIView):
+    def get(self , request , user_id, disorder_id):
+        try:
+            # Fetch session IDs and their order for the given user
+            sessions = Sessions.objects.filter(
+                user_id=user_id, 
+                session_status__in=['Completed', 'quick_assessment_status']
+            ).order_by("session_id").values("session_id", "session_type_id", "session_status")
+
+            # Generate session order mapping
+            session_order = {session["session_id"]: index + 1 for index, session in enumerate(sessions)}
+            print(session_order)
+            # Fetch assessment results based on session IDs and disorder ID
+            assessment_results = AssessmentResults.objects.filter(
+                user_id=user_id, disorder_id=disorder_id
+            ).select_related("session").values(
+                "session_id", "emotion", "score", "assessment_date"
+            )
+            if len(assessment_results) == 0 :
+                return 
+            response_data = []
+            if(disorder_id == 1):
+                response_data = get_assessment_articulation(assessment_results,session_order)
+            elif(disorder_id == 2):
+                response_data = get_assessment_stammering(assessment_results,session_order)
+            elif(disorder_id == 3):
+                response_data = get_assessment_voice(assessment_results,session_order)
+            elif(disorder_id == 4):
+                response_data = get_assessment_expressive(assessment_results,session_order)
+            elif(disorder_id == 5):
+                response_data = get_assessment_receptive(assessment_results,session_order)
+            else:
+                return Response({"message": "No Disorder found for the id"},status=status.HTTP_204_NO_CONTENT)
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
