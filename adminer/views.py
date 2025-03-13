@@ -21,26 +21,36 @@ def get_date_filter(time_filter):
 # Create your views here.
 #/get_users_overview
 class TotalUsersWithRevenue(APIView):
-    def post(self,request):
-            try:
-                time_filter = request.GET.get('time_filter')
-                date_filter =None
-                if time_filter == 'last_month':
-                    date_filter = now() - timedelta(days=30)
-                elif time_filter == 'annual':
-                    date_filter = now() - timedelta(days=365)
+    def get(self, request):
+        try:
+            time_filter = request.GET.get('time_filter')
+            date_filter = None
+            
+            if time_filter == 'last_month':
+                date_filter = now() - timedelta(days=30)
+            elif time_filter == 'annual':
+                date_filter = now() - timedelta(days=365)
 
-                query_result = CustomUser.objects.filter(created_account__gte=date_filter,user_type="patient").aggregate(
-                    total_revenue=Coalesce(
-                        Sum('payments__amount', filter=Q(payments__payment_date__gte=date_filter) & Q(payments__payment_status='Paid')),
-                        Value(0.0, output_field=FloatField())
-                    ),
-                    total_users=Count('user_id',distinct=True)
-                )
-               
-                return Response({query_result},status=status.HTTP_200_OK)
-            except Exception as e:
-                return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
+            # Define payment filter condition
+            payment_filter = Q(payments__payment_status='Paid')
+            if date_filter:
+                payment_filter &= Q(payments__payment_date__gte=date_filter)
+                user_filter = Q(created_account__gte=date_filter)
+
+            # Query result
+            query_result = CustomUser.objects.filter(user_type="patient").aggregate(
+                total_revenue=Coalesce(
+                    Sum('payments__amount', filter=payment_filter),
+                    Value(0.0, output_field=FloatField())
+                ),
+                total_users=Count('user_id',filter=user_filter, distinct=True)
+            )
+
+            return Response(query_result, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({"error": f'Error occurred: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
 
 #/get_registration_percentage
 class RegistrationPercentage(APIView):
@@ -63,7 +73,7 @@ class RegistrationPercentage(APIView):
                 registration_percentage = 0.0
 
             
-            return Response({registration_percentage},status=status.HTTP_200_OK)
+            return Response({"registration_percentage":registration_percentage,"total_users":total_registrations,"today_registrations":today_registrations},status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -72,7 +82,7 @@ class RegistrationPercentage(APIView):
 class RevenuePercentage(APIView):
     def get(self,request):
         try:
-            users_types = request.data.get('users_types')  #['patient', 'clinic'] list of user_types
+            users_types = request.data.get('user_types')  #['patient', 'clinic'] list of user_types
             time_filter = request.GET.get('time_filter')  # Get time filter from request
             date_filter =get_date_filter(time_filter)
 
@@ -95,7 +105,7 @@ class RevenuePercentage(APIView):
             else:
                 revenue_percentage = 0.0
             
-            return Response({todays_revenue,revenue_percentage},status=status.HTTP_200_OK)
+            return Response({"todays_revenue":todays_revenue,"revenue_percentage":revenue_percentage,"total_revenue":total_revenue},status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 

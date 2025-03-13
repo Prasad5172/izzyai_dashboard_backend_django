@@ -2,8 +2,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Sum, Count, F, Q, FloatField,Value,CharField,OuterRef,Subquery,Case,When,IntegerField,Avg
-from django.db.models.functions import TruncDate,TruncTime
+from django.db.models import Sum, Count, F, Q, FloatField,Value,CharField,OuterRef,Subquery,Case,When,IntegerField,Avg,DateField
+from django.db.models.functions import TruncDate,TruncTime,Cast
 from django.utils.crypto import get_random_string
 from django.conf import settings
 import re
@@ -23,63 +23,36 @@ from authentication.models import CustomUser ,UserProfile
 from collections import defaultdict
 #/get_slp_details,
 #/update_slp/<int:SlpID>
-class Slp(APIView):
+class SlpView(APIView):
     # permission_classes = [IsAuthenticated]
 
-    def get(self , request , SlpID ):
-
-        """
-        Get details of a specific Speech-Language Pathologist (SLP).
-
-        This endpoint retrieves the details of an SLP, including their name, contact information, 
-        clinic assignment, the number of users assigned to them, and their profile picture path. 
-
-        Args:
-        - SlpID (int): The unique identifier of the Speech-Language Pathologist (SLP).
-
-        Returns:
-        JSON:
-            - SlpID: The unique ID of the SLP.
-            - SlpName: The name of the SLP.
-            - Phone: The phone number of the SLP.
-            - Email: The email address of the SLP.
-            - Country: The country where the SLP is based.
-            - State: The state where the SLP is based.
-            - ClinicName: The name of the clinic assigned to the SLP, or 'No Clinic Assigned' if none is assigned.
-            - UsersAssigned: The number of users currently assigned to the SLP.
-            - ProfilePicture: The file path to the SLP's profile picture.
-
-        Error Responses:
-            - 500 Internal Server Error: If there is an issue with the database connection or a query failure.
-            Example: {"error": "Database connection error"}
-            - 404 Not Found: If no SLP is found with the provided SlpID.
-            Example: {"message": "SLP not found"}
-        """
-        
+    def get(self , request ):
         try:
-            slp = Slps.objects.filter(slp_id=SlpID).annotate(
+            slp_id = request.GET.get('slp_id')
+            slp = Slps.objects.filter(slp_id=slp_id).annotate(
                 users_assigned=Count("user_profiles__user")
-            ).values("slp_id", "slp_name", "phone", "email", "country", "state","clinic__clinic_id","users_assigned","profile_image_path").first()
+            ).values("slp_id", "slp_name", "phone", "email", "country", "state","clinic__clinic_id","clinic__clinic_name","users_assigned","profile_image_path").first()
             
             response = {
-                "SlpID": slp.slp_id,
-                "SlpName": slp.slp_name,
-                "Phone": slp.phone,
-                "Email": slp.email,
-                "Country": slp.country,
-                "State": slp.state,
-                "ClinicName": slp.clinic.clinic_name if slp.clinic else "No Clinic Assigned",
-                "UsersAssigned": slp.users_assigned,
-                "ProfileImagePath":slp.profile_image_path
+                "SlpID": slp["slp_id"],
+                "SlpName": slp["slp_name"],
+                "Phone": slp["phone"],
+                "Email": slp["email"],
+                "Country": slp['country'],
+                "State": slp["state"],
+                "ClinicName": slp["clinic__clinic_name"],
+                "UsersAssigned": slp["users_assigned"],
+                "ProfileImagePath":slp["profile_image_path"]
             }
             return Response(response, status=status.HTTP_200_OK)
         except Slps.DoesNotExist:
             return Response({"message": "SLP not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    def put(self, request, SlpID):
+    def put(self, request):
         try:
+            slp_id = request.GET.get('slp_id')
             # Fetch the salesperson object
-            salesperson = Slps.objects.filter(sales_person_id=SlpID).first()
+            salesperson = Slps.objects.filter(slp_id=slp_id).first()
             if not salesperson:
                 return Response({'error': 'SalePerson not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -96,21 +69,21 @@ class Slp(APIView):
             salesperson.save()
 
             return Response({'message': 'Profile updated successfully'}, status=status.HTTP_200_OK)
-
         except Exception as e:
             return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 #/get_completed_patients,/get_assign_patients/<int:SlpID>
-class CompletedPatients(APIView):
-    def get(self , request , SlpID ):
+class CompletedPatientsCountView(APIView):
+    def get(self , request ):
         try:
-            count = Slps.objects.filter(slp_id=SlpID).annotate(
+            slp_id = request.GET.get('slp_id')
+            count = Slps.objects.filter(slp_id=slp_id).annotate(
                 completed_patients = Count(
                     "user_profiles"
                     ,filter=Q(user_profiles__status="Archived")),
                 patients = Count("user_profiles"),
-            ).values_list("patients","completed_patients")
-            return Response({"patients":count[0],"completed_patients":count[2]}, status=status.HTTP_200_OK)
+            ).values("patients","completed_patients").first()
+            return Response({"patients":count["patients"],"completed_patients":count['completed_patients']}, status=status.HTTP_200_OK)
         except Slps.DoesNotExist:
             return Response({"message": "No users found for the given SlpID"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -118,29 +91,33 @@ class CompletedPatients(APIView):
 #/update_patient_details/<int:UserID>
 #/get_users_by_slp/<int:SlpID>
 #/get_user_info_by_slp/<int:slp_id>(management route)
-class Patients(APIView):
-    def get(self , request , slp_id ):
+class PatientsBySlpView(APIView):
+    def get(self , request):
         try:
+            slp_id = request.GET.get('slp_id')
+            if not slp_id:
+                return Response({'message': 'slp_id is required'}, status=status.HTTP_400_BAD_REQUEST)
             patients = UserProfile.objects.filter(
                 slp_id=slp_id
-            ).values_list("user_id","full_name","age","dob","user__email")
+            ).annotate(
+                email=F("user__email")
+            ).values("user_id","full_name","age","dob","email")
             return Response(patients, status=status.HTTP_200_OK)
         except Slps.DoesNotExist:
             return Response({"message": "No users found for the given SlpID"}, status=status.HTTP_404_NOT_FOUND)
     
-    def put(self, request, UserID):
+    def put(self, request):
         try:
-            email = request.data.get('Email')
-            username = request.data.get('UserName')
-            #age = request.data.get('Age')
-            #gender = request.data.get('Gender')
-            #country = request.data.get('Country')
-            status = request.data.get('Status')
-            user_profile = get_object_or_404(UserProfile, user_id=UserID)
+            slp_id = request.GET.get("slp_id")
+            user_id = request.data.get('user_id')
+            email = request.data.get('email')
+            username = request.data.get('username')
+            user_profile = get_object_or_404(UserProfile, user_id=user_id)
             user = user_profile.user 
             if not user:
                 return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-            
+            if user_profile.slp_id != slp_id:
+                return Response({'error': 'User does not belong to the specified SLP'}, status=status.HTTP_400_BAD_REQUEST)
             if email:
                 user.email = email
             if username:
@@ -159,17 +136,20 @@ class Patients(APIView):
             return Response({'error': f'Error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 #/get_users_logs/<int:SlpID>
-class UserLogs(APIView):
-    def get(self , request , SlpID ):
+class UserLogsView(APIView):
+    def get(self , request ):
+        print("hi")
         try:
+            slp_id = request.GET.get("slp_id")
             time_filter = request.GET.get('time_filter')
-            date_filter = None
-            if time_filter == 'last_month':
-                date_filter = now() - timedelta(days=30)
-            elif time_filter == 'annual':
-                date_filter = now() - timedelta(days=365)
 
-            logins = UserProfile.objects.filter(slp_id=8).annotate(
+            date_filter = None
+            if time_filter == 'annual':
+                date_filter = now() - timedelta(days=365)
+            else:
+                date_filter = now() - timedelta(days=30)
+
+            logins = UserProfile.objects.filter(slp_id=slp_id).filter(user__last_login__gte=date_filter).annotate(
                 login_date=TruncDate("user__last_login"),
                 login_time=TruncTime("user__last_login")
             ).values("user_id", "login_date", "login_time","user__username")
@@ -180,33 +160,36 @@ class UserLogs(APIView):
 #/get_attendance_tracking_over_time/<int:slp_id>
 #check at date_filter from flask code
 class AttendanceTracking(APIView):
-    def get(self,request,SlpID):
-        start_date_str = request.GET.get('start_date') #'YYYY-MM-DD' format
-        end_date_str = request.GET.get('end_date')
+    def get(self,request):
         try:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date() if start_date_str else None
-            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date() if end_date_str else None
+            slp_id = request.GET.get("slp_id")
+            start_date_str = request.data.get('start_date') #'YYYY-MM-DD' format
+            end_date_str = request.data.get('end_date')
+            try:
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date() if start_date_str else None
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date() if end_date_str else None
+            except ValueError:
+                return Response({"error": "Invalid date format. Please use 'YYYY-MM-DD'."}, status=400)
             # Base query filtering by SLP ID
-            appointments = ClinicAppointments.objects.filter(slp_id=8)
-
+            appointments = ClinicAppointments.objects.filter(slp_id=slp_id)
             # Apply date filters if provided
             if start_date and end_date:
-                appointments = appointments.filter(appointment_date__date__range=[start_date, end_date])
+                appointments = appointments.filter(appointment_date__range=[start_date, end_date])
             elif start_date:
-                appointments = appointments.filter(appointment_date__date__gte=start_date)
+                appointments = appointments.filter(appointment_date__gte=start_date)
             elif end_date:
-                appointments = appointments.filter(appointment_date__date__lte=end_date)
+                appointments = appointments.filter(appointment_date__lte=end_date)
 
             # Aggregate attendance data by appointment date
             attendance_data = appointments.annotate(
-                appointment_day=TruncDate('appointment_date')
+                appointment_day=Cast('appointment_date', DateField())
             ).values('appointment_day').annotate(
                 PresentDays=Count(Case(When(appointment_status='Attended', then=1), output_field=IntegerField())),
                 AbsentDays=Count(Case(When(appointment_status='NotAttended', then=1), output_field=IntegerField()))
-            ).order_by('appointment_date').values(
-                date = F('appointment_day'),
-                present_days = F('PresentDays'),
-                absent_days = F('AbsentDays')
+            ).order_by('appointment_day').values(
+                date=F('appointment_day'),
+                present_days=F('PresentDays'),
+                absent_days=F('AbsentDays')
             )
 
             if not attendance_data:
@@ -220,40 +203,47 @@ class AttendanceTracking(APIView):
 
 #/update_patient_status_under_slp/<int:user_id>
 class UpdatePatientStatus(APIView):
-    def put(self , request , UserID ):
+    def put(self , request  ):
         try:
-            user = UserProfile.objects.get(user_id=UserID)
+            user_id = request.GET.get("user_id")
+            if not user_id:
+                return Response({'message': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            user = UserProfile.objects.get(user_id=user_id)
             user.patient_status = "Completed"
             user.save()
-            return Response({'message': f'PatientStatus updated to Completed for UserID {UserID}'}, status=status.HTTP_200_OK)
+            return Response({'message': f'PatientStatus updated to Completed for user_id {user_id}'}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
 
 #/get_users_and_disorders_by_slp/<int:SlpID>
 class GetUsersAndDisordersBySLP(APIView):
-    def get(self , request , SlpID ):
+    def get(self , request ):
         try:
-            users = UserProfile.objects.filter(slp_id=SlpID)
-            disorders = Disorders.objects.all()
+            slp_id = request.GET.get('slp_id')
+            if not slp_id:
+                return Response({'message': 'slp_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            users = UserProfile.objects.filter(slp_id=slp_id).values("user_id","full_name","age","dob","user__email")
+            disorders = Disorders.objects.all().values("disorder_id","disorder_name")
             return Response({"users":users,"disorders":disorders}, status=status.HTTP_200_OK)
         except Slps.DoesNotExist:
-            return Response({"message": "No users found for the given SlpID"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": "No users found for the given slp_id"}, status=status.HTTP_404_NOT_FOUND)
 
 #/create_slps_appointment,
 #/get_slp_appointments_details/<int:slp_id>
 #/attend_appointment/<int:appointment_id>
 #/cancel_appointment/<int:appointment_id>
+#/update_slp_appointment_status/<int:appointment_id>
 #need to check at start and end time
-class SlpAppoinment(APIView):
+class SlpAppoinmentView(APIView):
     def post(self,request):
         try:
-            slp_id = request.data.get("SlpID")
-            user_id = request.data.get('UserID')
-            disorder_ids = request.data.get('DisorderID') 
-            session_type = request.data.get('SessionType')
-            appointment_date = request.data.get('AppointmentDate')
-            start_time = request.data.get('StartTime')
-            end_time = request.data.get('EndTime')
+            slp_id = request.data.get("slp_id")
+            user_id = request.data.get('user_id')
+            disorder_id = request.data.get('disorder_id') 
+            session_type = request.data.get('session_type')
+            appointment_date = request.data.get('appointment_date')
+            start_time = request.data.get('start_time')
+            end_time = request.data.get('end_time')
 
             # Convert strings to datetime format (YYYY-MM-DD HH:MM:SS)
             start_timestamp = datetime.strptime(f"{appointment_date} {start_time}", "%Y-%m-%d %H:%M:%S")
@@ -262,7 +252,7 @@ class SlpAppoinment(APIView):
             SlpAppointments.objects.create(
                 slp_id=slp_id,
                 user_id=user_id,
-                disorder_id=disorder_ids,
+                disorder_id=disorder_id,
                 session_type=session_type,
                 appointment_date=appointment_date,
                 start_time=start_timestamp,
@@ -272,22 +262,23 @@ class SlpAppoinment(APIView):
         except Slps.DoesNotExist:
             return Response({"message": "No users found for the given SlpID"}, status=status.HTTP_404_NOT_FOUND)
 
-    def get(self,request,slp_id):
+    def get(self,request):
         try:
-            slp_id = request.GET.get('SlpID')
-            appointments = SlpAppointments.objects.filter(slp_id=slp_id).annotate(
-                appointment_date=TruncDate("appointment_date"),
-                start_time=TruncTime("start_time"),
-                end_time=TruncTime("end_time")
-            ).values("appointment_id","appointment_date","start_time","end_time","appointment_status")
+            slp_id = request.GET.get('slp_id')
+            if not slp_id:
+                return Response({'message': 'slp_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            appointments = SlpAppointments.objects.filter(slp_id=slp_id).values("appointment_id","appointment_date","start_time","end_time","appointment_status")
             return Response({"appointments": list(appointments)}, status=status.HTTP_200_OK)
         except Slps.DoesNotExist:
             return Response({"message": "No users found for the given SlpID"}, status=status.HTTP_404_NOT_FOUND)
 
-    def put(self,request,appointment_id):
+    def put(self,request):
         try:
+            appointment_id = request.data.get('appointment_id')
             appointment_status = request.data.get('AppointmentStatus')
-            if(appointment_status == "Cancelled" or appointment_status == "Attend" or appointment_status == "Pending"):
+            if not appointment_id:
+                return Response({'message': 'appointment_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            if(appointment_status == "Cancelled" or appointment_status == "Attended" or appointment_status == "Pending"):
                 return Response({"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
             SlpAppointments.objects.filter(appointment_id=appointment_id).update(appointment_status=appointment_status)
             return Response({'message': 'Appointment status updated successfully.'}, status=status.HTTP_200_OK)
@@ -296,11 +287,12 @@ class SlpAppoinment(APIView):
 
 #/reschedule_appointment/<int:appointment_id>
 class RescheduleAppoinment(APIView):
-    def put(self,request,appointment_id):
+    def put(self,request):
         try:
-            appointment_date = request.data.get('AppointmentDate')
-            start_time = request.data.get('StartTime')
-            end_time = request.data.get('EndTime')
+            appointment_id = request.GET.get('appointment_id')
+            appointment_date = request.data.get('appointment_date')
+            start_time = request.data.get('start_time')
+            end_time = request.data.get('end_time')
 
             # Convert strings to datetime format (YYYY-MM-DD HH:MM:SS)
             start_timestamp = datetime.strptime(f"{appointment_date} {start_time}", "%Y-%m-%d %H:%M:%S")
@@ -315,33 +307,35 @@ class RescheduleAppoinment(APIView):
         except Slps.DoesNotExist:
             return Response({"message": "No users found for the given SlpID"}, status=status.HTTP_404_NOT_FOUND)
 
-#/get_slp_tasks/<int:slp_id>
+#/get_tasks_by_slp
 #/update_slp_task_status
-class SlpTasks(APIView):
-    def get(self , request , SlpID ):
+class SlpTasksView(APIView):
+    def get(self,request):
         try:
-            tasks = Tasks.objects.filter(slp_id=SlpID).values("task_name","task_id","description","status","slp_id","clinic_id")
+            slp_id = request.GET.get('slp_id')
+            tasks = Tasks.objects.filter(slp_id=slp_id,).values("task_name","task_id","description","status","slp_id","clinic_id")
             return Response(tasks, status=status.HTTP_200_OK)
         except Slps.DoesNotExist:
             return Response({"message": "No users found for the given SlpID"}, status=status.HTTP_404_NOT_FOUND)
 
     def put(self,request):
         try:
-            task_id = request.data.get('TaskID')
-            slp_id = request.data.get('SlpID')
-            status = request.data.get('Status')
-            Tasks.objects.filter(task_id=task_id).update(status=status)
-            return Response({'message': 'Task status updated successfully.'}, status=status.HTTP_200_OK)
+            task_id = request.data.get('task_id')
+            slp_id = request.data.get('slp_id')
+            status = request.data.get('status')
+            flag = Tasks.objects.filter(task_id=task_id,slp_id=slp_id).update(status=status)
+            print(flag)
+            return Response({'message': 'Task status updated successfully.'}, status=200)
         except Slps.DoesNotExist:
-            return Response({"message": "No users found for the given SlpID"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"message": "No users found for the given SlpID"}, status=400)
 
 #/get_treatment_data,/get_treatment_ids,/create_treatment_data
-class TreatmentData(APIView):
+class TreatmentDataView(APIView):
     def get(self , request ):
         try:
-            user_id = request.data.get('UserID')
-            diagnosis_name = request.data.get('DiagnosisName')
-            treatment_data_id = request.data.get('TreatmentDataID')
+            user_id = request.data.get('user_id')
+            diagnosis_name = request.data.get('diagnosis_name')
+            treatment_data_id = request.data.get('treatment_data_id')
             filters = {
                 "user_id": user_id,
                 "diagnosis_name": diagnosis_name
@@ -350,7 +344,7 @@ class TreatmentData(APIView):
             # Conditionally add treatment_data_id if it exists
             if treatment_data_id:
                 filters["treatment_data_id"] = treatment_data_id
-            treatment_data = TreatmentData.objects.filter(filters).values(
+            treatment_data = TreatmentData.objects.filter(**filters).values(
                 "patient_name",
                 "patient_age",
                 "diagnosis_name",
@@ -368,15 +362,15 @@ class TreatmentData(APIView):
 
     def post(self,request):
         try:
-            patient_name = request.data.get('PatientName')
-            patient_age = request.data.get('PatientAge')
-            diagnosis_name = request.data.get('DiagnosisName')
-            therapist_name = request.data.get('TherapistName')
-            date = request.data.get('Date')
-            goal = request.data.get('Goal')
-            interventions = request.data.getlist('Interventions')  
-            user_id = request.data.get('UserID')  
-            slp_id = request.data.get('SlpID')
+            patient_name = request.data.get('patient_name')
+            patient_age = request.data.get('patient_age')
+            diagnosis_name = request.data.get('diagnosis_name')
+            therapist_name = request.data.get('therapist_name')
+            date = request.data.get('date')
+            goal = request.data.get('goal')
+            interventions = request.data.getlist('interventions')  
+            user_id = request.data.get('user_id')  
+            slp_id = request.data.get('slp_id')
             # Verify user_id
             user = get_object_or_404(CustomUser, user_id=user_id)
 
@@ -403,7 +397,6 @@ class TherapyDataIds(APIView):
     def get(self , request ):
         try:
             therapy_ids = TherapyData.objects.values("therapy_data_id","submit_date")
-            
             return Response(therapy_ids, status=status.HTTP_200_OK)
         except Slps.DoesNotExist:
             return Response({"message": "No users found for the given SlpID"}, status=status.HTTP_404_NOT_FOUND)
@@ -411,14 +404,18 @@ class TherapyDataIds(APIView):
 #/get_therapy_data   
 #/add_therapy_data 
 #need to check what's the use of user_id if therapy_data_id is given
-class TherapyData(APIView):
+class TherapyDataView(APIView):
     def get(self , request ):
         try:
-            user_id = request.data.get('UserID')
-            therapy_data_id = request.data.get('TherapyDataID')
+            user_id = request.data.get('user_id')
+            therapy_data_id = request.data.get('therapy_data_id')
+            
+            if not user_id or not therapy_data_id:
+                return Response({"message": "user_id and therapy_data_id are required"}, status=status.HTTP_400_BAD_REQUEST)
+
             therapy_data = TherapyData.objects.filter(
                 therapy_data_id=therapy_data_id,user_id=user_id
-            ).values_list(
+            ).values(
                 "therapy_data_id",
                 "patient_name",
                 "submit_date",
@@ -442,21 +439,21 @@ class TherapyData(APIView):
 
     def post(self,request):
         try:
-            patient_name = request.data.get('PatientName')
-            submit_date = request.data.get('SubmitDate')
-            slp_name = request.data.get('SlpName')
-            resources = request.data.get('Resources')
-            performance = request.data.get('Performance')
-            condition = request.data.get('Condition')
-            criterion = request.data.get('Criterion')
-            response_one = request.data.get('ResponseOne')
-            response_two = request.data.get('ResponseTwo')
-            response_three = request.data.get('ResponseThree')
-            response_four = request.data.get('ResponseFour')
-            response_five = request.data.get('ResponseFive')
-            objective = request.data.get('Objective')
-            user_id = request.data.get('UserID')  
-            slp_id = request.data.get('SlpID')
+            patient_name = request.data.get('patient_name')
+            submit_date = request.data.get('submit_date')
+            slp_name = request.data.get('slp_name')
+            resources = request.data.get('resources')
+            performance = request.data.get('performance')
+            condition = request.data.get('condition')
+            criterion = request.data.get('criterion')
+            response_one = request.data.get('response_one')
+            response_two = request.data.get('response_two')
+            response_three = request.data.get('response_three')
+            response_four = request.data.get('response_four')
+            response_five = request.data.get('response_five')
+            objective = request.data.get('objective')
+            user_id = request.data.get('user_id')  
+            slp_id = request.data.get('slp_id')
             # Verify user_id
             user = get_object_or_404(CustomUser, user_id=user_id)
 
@@ -485,22 +482,28 @@ class TherapyData(APIView):
             return Response({"message": "No users found for the given SlpID"}, status=status.HTTP_404_NOT_FOUND)
 
 #//get_slp_tasks/<int:slp_id>    
-class GetSLPTasks(APIView):
-    def get(self,request,slp_id):
+class GetSLPAppointmentsTask(APIView):
+    def get(self,request):
         try:
+            slp_id = request.GET.get('slp_id')
             slp_appoinment = SlpAppointments.objects.filter(
                 slp_id= slp_id
             ).annotate(
-                username = F("user__username")
-            ).values("user_id","session_type","appointment_date","username")
-            return Response({slp_appoinment},status=status.HTTP_200_OK)
+                task_name = F("session_type"),
+                details=F("user__username"),
+                due=F("appointment_date")
+            ).values("user_id","task_name","due","details")
+            return Response(slp_appoinment,status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
 
 #/get_appointments_goals/<int:slp_id>
 class SLPAppointmentsGoals(APIView):
-    def get(self,request,slp_id):
+    def get(self,request):
         try:
+            slp_id = request.GET.get('slp_id')
+            if not slp_id:
+                return Response({'message': 'Please provide a valid slp_id.'}, status=status.HTTP_400_BAD_REQUEST)
             # Fetch all appointment data
             slp_appointments = SlpAppointments.objects.filter(slp_id=8).select_related('user', 'disorder').values(
                 "user_id", "user__username", "disorder__disorder_name","session_type", "appointment_date"
@@ -556,8 +559,11 @@ class SLPAppointmentsGoals(APIView):
 #/get_slp_report/<int:SlpID>
 #need to check time filter dought, ask shafi brother.
 class SLPReport(APIView):
-    def get(self,request,slp_id):
+    def get(self,request):
         try:
+            slp_id = request.GET.get('slp_id')
+            if not slp_id:
+                return Response({'message': 'slp_id is required'}, status=status.HTTP_400_BAD_REQUEST)
             time_filter = request.GET.get("time_filter")
 
             # Step 3: Set Time Filters
@@ -570,7 +576,7 @@ class SLPReport(APIView):
                 start_time = today - timedelta(days=today.weekday())  # Monday of the current week
                 start_time = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
                 end_time = start_time + timedelta(days=6, hours=23, minutes=59, seconds=59, microseconds=999999)
-            elif time_filter == "monthly":
+            else :
                 start_time = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
                 end_time = today.replace(hour=23, minute=59, second=59, microsecond=999999)
 
@@ -583,7 +589,7 @@ class SLPReport(APIView):
                     .filter(
                         slp_id=slp_id,
                         appointment_status="Attended",
-                        #appointment_date__range=(start_time, end_time)
+                        appointment_date__range=(start_time, end_time)
                     )
                     .values("session_type")  # Grouping by session_type
                     .annotate(
@@ -598,7 +604,7 @@ class SLPReport(APIView):
                         email = F("slp__email")
                     )
                 )
-            if appointment_data.exists():
+            if len(appointment_data) != 0:
                 data = appointment_data[0]  # Get the first record
 
                 location = f"{data['clinic_name']}, {data['state']}, {data['country']}"
@@ -618,15 +624,20 @@ class SLPReport(APIView):
                     "SLP Phone No": data["phone"],
                     "SLP Email": data["email"],
                 }
+                return Response(result,status=status.HTTP_200_OK)
+            else:
+                return Response({"message": "No reports found for the given slp_id."}, status=status.HTTP_404_NOT_FOUND)
                 
-            return Response({result},status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
 
 #/get_user_attendance/<int:slp_id>
 class SLPPatinetAttendance(APIView):
-    def get(self,request,slp_id):
+    def get(self,request):
         try:
+            slp_id = request.GET.get('slp_id')
+            if not slp_id:
+                return Response({'message': 'slp_id is required'}, status=status.HTTP_400_BAD_REQUEST)
             appoinment_list = ClinicAppointments.objects.filter(slp_id=slp_id).values("appointment_date","appointment_status").order_by("appointment_date")
             return Response({
                 "slp_id":slp_id,
@@ -808,8 +819,13 @@ def get_excerise_receptive(user_exercises,session_order):
 #/get_exercise_voice/<int:user_id>/<int:disorder_id>
 #/get_exercise_expressive/<int:user_id>/<int:disorder_id>
 class GetExceriseResults(APIView):
-    def get(self,request,user_id,disorder_id):
+    def get(self,request):
         try:
+            user_id = request.GET.get("user_id")
+            disorder_id = request.GET.get("disorder_id")
+            print(user_id,disorder_id)
+            if not user_id or not disorder_id:
+                return Response({"message": "user_id and disorder_id are required"},status=status.HTTP_400_BAD_REQUEST)
             # Step 1: Fetch Sessions for the user
             sessions = (
                 Sessions.objects
@@ -817,10 +833,10 @@ class GetExceriseResults(APIView):
                 .order_by("session_id")
                 .values("session_id","session_status","session_type")
             )
+            print(sessions)
             # Step 2: Create a session order mapping
             session_order = {session["session_id"]: index + 1 for index, session in enumerate(sessions)}
 
-            print(session_order)
             # Step 3: Fetch UserExercises related to the given disorder_id
             user_exercises = (
                 UserExercises.objects
@@ -828,25 +844,26 @@ class GetExceriseResults(APIView):
                 .select_related("session")
                 .values("session_id", "emotion", "score", "exercise_date")  # Selecting required fields
             )
+            print(user_exercises)
             if(len(user_exercises) == 0):
                 return Response({"message": "No data found for the given UserID and DisorderID"},status=status.HTTP_204_NO_CONTENT)
             #print(user_exercises)
             
             
-            if(disorder_id == 1):
+            if(disorder_id == '1'):
                 response_data = get_excerise_articulation(user_exercises,session_order)
-            elif(disorder_id == 2):
+            elif(disorder_id == '2'):
                 response_data = get_excerise_stammering(user_exercises,session_order)
-            elif(disorder_id == 3):
+            elif(disorder_id == '3'):
                 response_data = get_excerise_voice(user_exercises,session_order)
-            elif(disorder_id == 4):
+            elif(disorder_id == '4'):
                 response_data = get_excerise_expressive(user_exercises,session_order)
-            elif(disorder_id == 5):
+            elif(disorder_id == '5'):
                 response_data = get_excerise_receptive(user_exercises,session_order)
             else:
-                return Response({"message": "No Disorder found for the id"},status=status.HTTP_204_NO_CONTENT)
+                return Response({"message": f"No Disorder found for the  id {disorder_id}"},status=status.HTTP_204_NO_CONTENT)
 
-            return Response({response_data},status=status.HTTP_200_OK)
+            return Response(response_data,status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
 

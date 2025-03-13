@@ -108,8 +108,9 @@ class ClinicOverview(APIView):
 #/get_patient_details/<int:clinic_id>
 #/get_payment_tracking/<int:clinic_id>
 class PatientOverview(APIView):
-    def get(self,request,clinic_id):
+    def get(self,request):
         try:
+            clinic_id = request.GET.get("clinic_id")
             time_filter = request.GET.get("time_filter")
             date_filter = get_date_filter(time_filter)
 
@@ -743,16 +744,17 @@ class AssignSalePersonToDemoRequest(APIView):
 ############### Clinics Screen ##########################
 #/get_total_clinics
 #/get_total_clinic_revenue
-
-class GetTotalClinics(APIView):
+class GetTotalClinicsOverview(APIView):
     def get(self,request):
             try:
-                location = request.GET.get('location', None)
+                location = request.data.get('location', None)
 
-                # Filter clinics by location
-                clinics_by_location = Clinics.objects.filter(state=location).prefetch_related(
-                    "user_profiles__user__payments"
-                )
+                # Filter clinics first
+                clinics_by_location = Clinics.objects.filter(state=location) if location else Clinics.objects.all()
+
+                # Then apply prefetch
+                clinics_by_location = clinics_by_location.prefetch_related("user_profiles__user__payments")
+
                 # Annotate each clinic with its stats
                 clinics = clinics_by_location.annotate(
                     patients_per_clinic=Count("user_profiles__user", distinct=True),
@@ -767,7 +769,7 @@ class GetTotalClinics(APIView):
                     ),
                     location=F("state"),
                 ).values(
-                    "clinic_name", "location", "patients_per_clinic", "slps_per_clinic", "revenue_per_clinic"
+                    "clinic_name","clinic_id", "location", "patients_per_clinic", "slps_per_clinic", "revenue_per_clinic"
                 )
                 
                 # Single query to get total revenue and clinic count
@@ -841,7 +843,11 @@ class GetClinicRegistractionPercentage(APIView):
                 else:
                     registration_percentage = 0.0
 
-                return Response({registration_percentage},status=status.HTTP_200_OK)
+                return Response({
+                    "registration_percentage":registration_percentage,
+                    "todays_registrations":todays_registrations,
+                    "total_registrations":total_registrations
+                    },status=status.HTTP_200_OK)
             except Exception as e:
                 return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
 

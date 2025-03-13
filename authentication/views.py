@@ -573,7 +573,7 @@ class InsuranceClaimPercantageView(APIView):
 #/get_user_profile/<int:UserID>
 #/update_user_profile/<int:UserID>
 class UserProfileView(APIView):
-    def get(self,request,user_id):
+    def get(self,request):
         try:
             user_id = request.GET.get('user_id')
             user = UserProfile.objects.filter(user_id=user_id).select_related("clinic",'user').values("full_name",'user__username','dob','user__email','status',"age","gender","country","state","clinic_id","contact_number","clinic__clinic_name","clinic__address").first()
@@ -596,8 +596,9 @@ class UserProfileView(APIView):
             return Response(user_details,status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
-    def put(self,request,user_id):
+    def put(self,request):
         try:
+            user_id = request.GET.get("user_id")
             # Fetch the UserProfile object with related User model in a single query
             user_profile = UserProfile.objects.select_related("user").get(user_id=user_id)
 
@@ -617,12 +618,15 @@ class UserProfileView(APIView):
             # Update User model fields (username & email)
             user = user_profile.user
             user_updated_fields = {}
-            username = request.data["username"]
-            email = request.data["email"]
-            if "username" in request.data and username != user.username:
+            username = request.data.get("username")  # Safely access username
+            email = request.data.get("email")        # Safely access email
+
+            user_updated_fields = {}
+
+            if username and username != user.username:
                 user_updated_fields["username"] = username
 
-            if "email" in request.data and email != user.email:
+            if email and email != user.email:
                 user_updated_fields["email"] = email
 
             if user_updated_fields:
@@ -633,7 +637,7 @@ class UserProfileView(APIView):
             return Response({'message': 'Patient Profile updated successfully'}, status=status.HTTP_200_OK)
             
         except Exception as e:
-            return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error":f'Error occurred: {str(e)}'},status=status.HTTP_400_BAD_REQUEST)
 
 #/get_users_details
 class CustomeUserOverview(APIView):
@@ -712,10 +716,10 @@ class CustomeUserOverview(APIView):
                 for user in users
             ]
 
-            return Response(user_list, status=status.HTTP_200_OK)
+            return Response(user_list, status=200)
 
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(e)}, status=400)
 
 #/get_users_revenue_details
 class CustomUserRevenueView(APIView):
